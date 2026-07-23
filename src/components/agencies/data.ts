@@ -8,7 +8,7 @@ export type Agency = {
   trend: Trend;
 };
 
-export const agencies: Agency[] = [
+const rawAgencies: Agency[] = [
   {
     id: "prestige-recovery-solutions",
     name: "Prestige Recovery Solutions",
@@ -44,4 +44,6 @@ export const agencies: Agency[] = [
     flags: 1,
     trend: "improving",
   },
-].sort((a, b) => a.score - b.score);
+];
+
+export const agencies: Agency[] = rawAgencies.sort((a, b) => a.score - b.score);
