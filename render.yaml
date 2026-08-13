@@ -1,0 +1,43 @@
+# Render blueprint for the Conduct Guardian backend.
+#
+# Deploy: push this repo to GitHub, then Render dashboard → New → Blueprint →
+# pick the repo. Render reads this file and provisions the service.
+#
+# The three `sync: false` vars are NOT read from here — Render prompts for them
+# once at create time and stores them encrypted. Never put real keys in this
+# file; it is committed.
+
+services:
+  - type: web
+    name: conduct-guardian-api
+    runtime: python
+    plan: free
+    region: singapore # closest available to Malaysia — keeps demo latency low
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    # Single worker: the /screen rate limiter and the /coaching summary cache
+    # are both in-process. More than one worker would give each its own copy,
+    # so the effective rate limit would multiply and cache hits would be a
+    # coin flip. Documented in README as a known scaling limit.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.5"
+      - key: GROQ_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: SEED_TOKEN
+        generateValue: true
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      - key: GROQ_MODEL_BULK
+        value: llama-3.1-8b-instant
+      - key: RATE_LIMIT_REQUESTS
+        value: "30"
+      - key: COACHING_CACHE_MINUTES
+        value: "30"

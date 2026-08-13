@@ -3,8 +3,11 @@
 import { motion } from "framer-motion";
 import { Mail, MessageCircle, MessageSquare, Phone } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-
-type Channel = "WhatsApp" | "SMS" | "Call" | "Email";
+import { EmptyState, ErrorState, LoadingRows } from "@/components/ui/data-state";
+import { api } from "@/lib/api/client";
+import { toLedgerRow } from "@/lib/api/adapters";
+import { useApi } from "@/lib/api/use-api";
+import type { Channel } from "@/components/ledger/data";
 
 const channelIcons: Record<Channel, LucideIcon> = {
   WhatsApp: MessageCircle,
@@ -12,50 +15,6 @@ const channelIcons: Record<Channel, LucideIcon> = {
   Call: Phone,
   Email: Mail,
 };
-
-const flags: {
-  time: string;
-  channel: Channel;
-  account: string;
-  snippet: string;
-  rule: string;
-}[] = [
-  {
-    time: "9:41 AM",
-    channel: "WhatsApp",
-    account: "Account #2038",
-    snippet: "You need to pay now or things will get a lot worse for you.",
-    rule: "Threatening Language",
-  },
-  {
-    time: "8:15 AM",
-    channel: "SMS",
-    account: "Account #5566",
-    snippet: "This is your final legal notice before criminal charges are filed.",
-    rule: "Misleading Legal Claim",
-  },
-  {
-    time: "Yesterday, 6:52 PM",
-    channel: "Call",
-    account: "Account #4471",
-    snippet: "I've called you twelve times today, you can't keep avoiding this.",
-    rule: "Harassment Pattern",
-  },
-  {
-    time: "Yesterday, 3:20 PM",
-    channel: "Email",
-    account: "Account #3190",
-    snippet: "Loan agreement summary — required disclosure statement not attached.",
-    rule: "Missing Disclosure",
-  },
-  {
-    time: "Yesterday, 11:03 AM",
-    channel: "SMS",
-    account: "Account #6642",
-    snippet: "We will contact your employer if you don't respond by Friday.",
-    rule: "Threatening Language",
-  },
-];
 
 function ChannelBadge({ channel }: { channel: Channel }) {
   const Icon = channelIcons[channel];
@@ -75,7 +34,20 @@ function RulePill({ rule }: { rule: string }) {
   );
 }
 
+// Rows with no rule are a CLEAR verdict, not missing data — styled after the
+// CLEAR state used elsewhere (ledger/verdict-badge.tsx, hardship/signal-badge.tsx).
+function ClearPill() {
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-full border border-stamp-green/40 bg-soft-green px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-stamp-green">
+      Clear
+    </span>
+  );
+}
+
 export function RecentFlags({ delay = 0 }: { delay?: number }) {
+  const { data, loading, error, retry } = useApi(() => api.ledger(1, 5));
+  const rows = (data?.entries ?? []).map(toLedgerRow);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -90,28 +62,43 @@ export function RecentFlags({ delay = 0 }: { delay?: number }) {
         Recent Flags
       </h2>
 
-      <ul className="mt-4 divide-y divide-hairline">
-        {flags.map((flag) => (
-          <li
-            key={`${flag.time}-${flag.account}`}
-            className="flex flex-col gap-3 py-4 first:pt-2 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div className="flex flex-1 items-start gap-3 sm:items-center">
-              <span className="w-32 shrink-0 font-mono text-xs text-navy-light">
-                {flag.time}
-              </span>
-              <ChannelBadge channel={flag.channel} />
-              <p className="text-sm text-ink-navy">
-                <span className="italic">&ldquo;{flag.snippet}&rdquo;</span>{" "}
-                <span className="font-mono text-xs text-navy-light">
-                  — {flag.account}
-                </span>
-              </p>
-            </div>
-            <RulePill rule={flag.rule} />
-          </li>
-        ))}
-      </ul>
+      <div className="mt-4">
+        {loading ? (
+          <LoadingRows rows={5} />
+        ) : error ? (
+          <ErrorState
+            message={error.message}
+            retryable={error.retryable}
+            onRetry={retry}
+            waking={error.code === "network_error"}
+          />
+        ) : rows.length === 0 ? (
+          <EmptyState message="No screening activity yet." />
+        ) : (
+          <ul className="divide-y divide-hairline">
+            {rows.map((row) => (
+              <li
+                key={row.id}
+                className="flex flex-col gap-3 py-4 first:pt-2 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="flex flex-1 items-start gap-3 sm:items-center">
+                  <span className="w-32 shrink-0 font-mono text-xs text-navy-light">
+                    {row.timestamp}
+                  </span>
+                  <ChannelBadge channel={row.channel} />
+                  <p className="text-sm text-ink-navy">
+                    <span className="italic">&ldquo;{row.snippet}&rdquo;</span>{" "}
+                    <span className="font-mono text-xs text-navy-light">
+                      — {row.account}
+                    </span>
+                  </p>
+                </div>
+                {row.rule ? <RulePill rule={row.rule} /> : <ClearPill />}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </motion.div>
   );
 }

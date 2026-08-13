@@ -1,0 +1,40 @@
+{
+  "agents": [
+    {
+      "agent_id": "aui-dashboard-34b897794c92ec04",
+      "agent_type": "ui-dashboard",
+      "started_at": "2026-08-13T13:32:33.830Z",
+      "parent_mode": "none",
+      "status": "running"
+    },
+    {
+      "agent_id": "aui-screening-873a771a4d2ec01a",
+      "agent_type": "ui-screening",
+      "started_at": "2026-08-13T13:24:57.102Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-08-13T13:32:49.233Z",
+      "duration_ms": 472131
+    },
+    {
+      "agent_id": "aui-timeline-ledger-040fb022bba2d6c3",
+      "agent_type": "ui-timeline-ledger",
+      "started_at": "2026-08-13T13:32:23.554Z",
+      "parent_mode": "none",
+      "status": "running"
+    },
+    {
+      "agent_id": "aui-tables-d2b86d73673f295a",
+      "agent_type": "ui-tables",
+      "started_at": "2026-08-13T13:25:43.419Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-08-13T13:31:04.544Z",
+      "duration_ms": 321125
+    }
+  ],
+  "total_spawned": 6,
+  "total_completed": 33,
+  "total_failed": 0,
+  "last_updated": "2026-08-13T13:32:49.350Z"
+}

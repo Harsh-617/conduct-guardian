@@ -1,29 +1,92 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/ui/data-state";
+import { api, ApiError } from "@/lib/api/client";
+import { formatTimestamp, ruleLabel } from "@/lib/api/adapters";
+import type { ApiChannel, ScreenResponse } from "@/lib/api/types";
 import { SamplePanel } from "./sample-panel";
 import { VerdictStamp } from "./verdict-stamp";
 import { EvidenceLog } from "./evidence-log";
 import { samples } from "./data";
-import type { LogEntry, SampleMessage } from "./data";
+import type { Channel, Highlight, LogEntry, SampleMessage, Verdict } from "./data";
 
-type Status = "idle" | "loading" | "done";
+type Status = "idle" | "loading" | "done" | "error";
 
-function formatTimestamp() {
-  return new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-  });
+/** UI channel labels -> the lowercase wire values the API expects. */
+const API_CHANNEL: Record<Channel, ApiChannel> = {
+  Call: "call",
+  WhatsApp: "whatsapp",
+  SMS: "sms",
+};
+
+/**
+ * What gets sent to /screen plus what the results panel needs to render
+ * itself back — kept together so the panel never has to re-derive request
+ * state from whatever is currently sitting in the textarea.
+ */
+type Submission = {
+  text: string;
+  channelLabel: string;
+  accountLabel: string | null;
+  apiChannel: ApiChannel | undefined;
+  accountId: string | undefined;
+};
+
+type Reviewed = {
+  submission: Submission;
+  response: ScreenResponse;
+};
+
+function submissionFromSample(sample: SampleMessage): Submission {
+  return {
+    text: sample.text,
+    channelLabel: sample.channel,
+    accountLabel: sample.account,
+    apiChannel: API_CHANNEL[sample.channel],
+    // Samples display "Account #4521" — the backend wants the bare
+    // external_id ("4521") and auto-creates the account if it's unseen.
+    accountId: sample.account.match(/(\d+)/)?.[1],
+  };
 }
 
-function TranscriptText({ sample }: { sample: SampleMessage }) {
-  const highlight = sample.result.highlight;
+function submissionFromText(text: string): Submission {
+  return {
+    text,
+    channelLabel: "Custom Input",
+    accountLabel: null,
+    // Left undefined rather than guessed: JSON.stringify drops undefined
+    // keys, so the backend applies its own default (whatsapp / "4471")
+    // instead of us fabricating a channel/account nobody chose.
+    apiChannel: undefined,
+    accountId: undefined,
+  };
+}
+
+/** Verbatim per the API contract — locate it in the submitted text, or don't highlight. */
+function buildHighlight(text: string, quotedPhrase: string | null): Highlight | null {
+  if (!quotedPhrase) return null;
+  const idx = text.indexOf(quotedPhrase);
+  if (idx === -1) return null;
+  return {
+    before: text.slice(0, idx),
+    match: quotedPhrase,
+    after: text.slice(idx + quotedPhrase.length),
+  };
+}
+
+function buildSnippet(text: string, quotedPhrase: string | null): string {
+  const source = quotedPhrase && text.includes(quotedPhrase) ? quotedPhrase : text;
+  const collapsed = source.replace(/\s+/g, " ").trim();
+  return collapsed.length > 70 ? `${collapsed.slice(0, 70)}…` : collapsed;
+}
+
+function TranscriptText({ text, highlight }: { text: string; highlight: Highlight | null }) {
   if (!highlight) {
-    return <>{sample.text}</>;
+    return <>{text}</>;
   }
   return (
     <>
@@ -40,14 +103,59 @@ export function ScreeningTool() {
   const [text, setText] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>("idle");
-  const [reviewed, setReviewed] = useState<SampleMessage | null>(null);
+  const [reviewed, setReviewed] = useState<Reviewed | null>(null);
+  const [apiError, setApiError] = useState<ApiError | null>(null);
+  const [lastSubmission, setLastSubmission] = useState<Submission | null>(null);
   const [entries, setEntries] = useState<LogEntry[]>([]);
 
+  // Guards against a slow, superseded request clobbering the result of a
+  // faster one that was started after it.
+  const requestSeq = useRef(0);
+
+  async function runScreen(submission: Submission) {
+    const seq = ++requestSeq.current;
+    setStatus("loading");
+    setApiError(null);
+    setLastSubmission(submission);
+
+    try {
+      const response = await api.screen({
+        text: submission.text,
+        channel: submission.apiChannel,
+        account_id: submission.accountId,
+      });
+      if (seq !== requestSeq.current) return;
+
+      setReviewed({ submission, response });
+      setStatus("done");
+      setEntries((prev) => [
+        {
+          id: `${response.screening_result_id}-${response.message_id}`,
+          timestamp: formatTimestamp(new Date().toISOString()),
+          snippet: buildSnippet(submission.text, response.verdict.quoted_phrase),
+          verdict: response.verdict.violation ? "FLAGGED" : "CLEAR",
+          rule: ruleLabel(response.verdict.rule),
+        },
+        ...prev,
+      ]);
+    } catch (err) {
+      if (seq !== requestSeq.current) return;
+      setApiError(
+        err instanceof ApiError ? err : new ApiError("Something went wrong.", "unknown", true, 0),
+      );
+      setStatus("error");
+    }
+  }
+
   function handleSelectSample(sample: SampleMessage) {
+    if (status === "loading") return;
     setSelectedId(sample.id);
     setText(sample.text);
-    setStatus("idle");
     setReviewed(null);
+    setApiError(null);
+    // Presets are a convenience for filling the box — selecting one runs the
+    // exact same real screen as typing the text in and pressing the button.
+    void runScreen(submissionFromSample(sample));
   }
 
   function handleTextChange(value: string) {
@@ -55,43 +163,26 @@ export function ScreeningTool() {
     setSelectedId(null);
     setStatus("idle");
     setReviewed(null);
+    setApiError(null);
   }
 
   function handleRun() {
     if (!text.trim() || status === "loading") return;
-
-    setStatus("loading");
-    setReviewed(null);
-
-    window.setTimeout(() => {
-      const selectedSample = selectedId
-        ? samples.find((sample) => sample.id === selectedId)
-        : null;
-      const outcome =
-        selectedSample ??
-        samples[Math.floor(Math.random() * samples.length)];
-
-      setReviewed(outcome);
-      setStatus("done");
-
-      const snippet =
-        outcome.result.highlight?.match ??
-        (outcome.text.length > 70
-          ? `${outcome.text.slice(0, 70)}…`
-          : outcome.text);
-
-      setEntries((prev) => [
-        {
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          timestamp: formatTimestamp(),
-          snippet: snippet.replace(/\s+/g, " ").trim(),
-          verdict: outcome.result.verdict,
-          rule: outcome.result.rule,
-        },
-        ...prev,
-      ]);
-    }, 1500);
+    const selectedSample = selectedId ? samples.find((s) => s.id === selectedId) : null;
+    void runScreen(selectedSample ? submissionFromSample(selectedSample) : submissionFromText(text.trim()));
   }
+
+  function handleRetry() {
+    if (lastSubmission) void runScreen(lastSubmission);
+  }
+
+  const viewModel = reviewed
+    ? {
+        verdict: (reviewed.response.verdict.violation ? "FLAGGED" : "CLEAR") as Verdict,
+        rule: ruleLabel(reviewed.response.verdict.rule),
+        highlight: buildHighlight(reviewed.submission.text, reviewed.response.verdict.quoted_phrase),
+      }
+    : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -136,21 +227,42 @@ export function ScreeningTool() {
           </div>
 
           <AnimatePresence mode="wait">
-            {status === "done" && reviewed && (
+            {status === "error" && apiError && (
               <motion.div
-                key={reviewed.id + entries.length}
+                key="error"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35 }}
+                className="mt-6 border-t border-hairline pt-6"
+              >
+                <ErrorState
+                  message={apiError.message}
+                  retryable={apiError.retryable}
+                  onRetry={handleRetry}
+                  waking={apiError.code === "network_error"}
+                />
+              </motion.div>
+            )}
+
+            {status === "done" && reviewed && viewModel && (
+              <motion.div
+                key={reviewed.response.screening_result_id}
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35 }}
                 className="mt-6 flex flex-col gap-5 border-t border-hairline pt-6"
               >
                 <div className="flex flex-wrap items-center gap-4">
-                  <VerdictStamp verdict={reviewed.result.verdict} />
+                  <VerdictStamp verdict={viewModel.verdict} />
                   <div className="font-mono text-xs text-navy-light">
                     <p>
-                      {reviewed.channel} · {reviewed.account}
+                      {reviewed.submission.channelLabel}
+                      {reviewed.submission.accountLabel ? ` · ${reviewed.submission.accountLabel}` : ""}
                     </p>
-                    <p>Reviewed at {formatTimestamp()}</p>
+                    <p>Reviewed at {formatTimestamp(new Date().toISOString())}</p>
+                    <p>
+                      {reviewed.response.model} · {reviewed.response.latency_ms}ms
+                    </p>
                   </div>
                 </div>
 
@@ -159,32 +271,44 @@ export function ScreeningTool() {
                     Transcript
                   </p>
                   <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink-navy">
-                    <TranscriptText sample={reviewed} />
+                    <TranscriptText text={reviewed.submission.text} highlight={viewModel.highlight} />
                   </p>
                 </div>
 
-                {reviewed.result.verdict === "FLAGGED" ? (
+                {viewModel.verdict === "FLAGGED" ? (
                   <>
-                    <div>
-                      <span className="inline-flex items-center rounded-full bg-soft-brass px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-brass-accent">
-                        Rule Broken: {reviewed.result.rule}
-                      </span>
-                    </div>
+                    {viewModel.rule && (
+                      <div>
+                        <span className="inline-flex items-center rounded-full bg-soft-brass px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-brass-accent">
+                          Rule Broken: {viewModel.rule}
+                        </span>
+                      </div>
+                    )}
 
-                    <div className="rounded border border-stamp-green/25 bg-soft-green px-4 py-4">
-                      <p className="font-mono text-[10px] uppercase tracking-wide text-stamp-green">
-                        Suggested Compliant Rewrite
+                    <div className="rounded border border-hairline bg-paper px-4 py-4">
+                      <p className="font-mono text-[10px] uppercase tracking-wide text-navy-light">
+                        Explanation
                       </p>
                       <p className="mt-2 text-sm leading-relaxed text-ink-navy">
-                        {reviewed.result.rewrite}
+                        {reviewed.response.verdict.explanation}
                       </p>
                     </div>
+
+                    {reviewed.response.verdict.suggested_rewrite && (
+                      <div className="rounded border border-stamp-green/25 bg-soft-green px-4 py-4">
+                        <p className="font-mono text-[10px] uppercase tracking-wide text-stamp-green">
+                          Suggested Compliant Rewrite
+                        </p>
+                        <p className="mt-2 text-sm leading-relaxed text-ink-navy">
+                          {reviewed.response.verdict.suggested_rewrite}
+                        </p>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <div className="rounded border border-stamp-green/25 bg-soft-green px-4 py-4">
                     <p className="text-sm leading-relaxed text-ink-navy">
-                      No violations detected — this message meets conduct
-                      standards.
+                      {reviewed.response.verdict.explanation}
                     </p>
                   </div>
                 )}

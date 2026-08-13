@@ -1,0 +1,123 @@
+{
+  "updatedAt": "2026-08-13T13:32:49.233Z",
+  "missions": [
+    {
+      "id": "session:afa521e3-00eb-4ab0-9f24-6b9bc8e3d418:none",
+      "source": "session",
+      "name": "none",
+      "objective": "Session mission",
+      "createdAt": "2026-08-13T13:24:38.085Z",
+      "updatedAt": "2026-08-13T13:32:49.233Z",
+      "status": "running",
+      "workerCount": 4,
+      "taskCounts": {
+        "total": 4,
+        "pending": 0,
+        "blocked": 0,
+        "inProgress": 2,
+        "completed": 2,
+        "failed": 0
+      },
+      "agents": [
+        {
+          "name": "ui-dashboard:aui-das",
+          "role": "ui-dashboard",
+          "ownership": "aui-dashboard-34b897794c92ec04",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-08-13T13:32:33.830Z"
+        },
+        {
+          "name": "ui-screening:aui-scr",
+          "role": "ui-screening",
+          "ownership": "aui-screening-873a771a4d2ec01a",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-08-13T13:32:49.233Z"
+        },
+        {
+          "name": "ui-timeline-ledger:aui-tim",
+          "role": "ui-timeline-ledger",
+          "ownership": "aui-timeline-ledger-040fb022bba2d6c3",
+          "status": "running",
+          "currentStep": null,
+          "latestUpdate": null,
+          "completedSummary": null,
+          "updatedAt": "2026-08-13T13:32:23.554Z"
+        },
+        {
+          "name": "ui-tables:aui-tab",
+          "role": "ui-tables",
+          "ownership": "aui-tables-d2b86d73673f295a",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-08-13T13:31:04.544Z"
+        }
+      ],
+      "timeline": [
+        {
+          "id": "session-stop:aui-screening-873a771a4d2ec01a:2026-08-13T13:32:26.827Z",
+          "at": "2026-08-13T13:32:26.827Z",
+          "kind": "completion",
+          "agent": "ui-screening:aui-scr",
+          "detail": "completed",
+          "sourceKey": "session-stop:aui-screening-873a771a4d2ec01a"
+        },
+        {
+          "id": "session-stop:aui-screening-873a771a4d2ec01a:2026-08-13T13:32:30.932Z",
+          "at": "2026-08-13T13:32:30.932Z",
+          "kind": "completion",
+          "agent": "ui-screening:aui-scr",
+          "detail": "completed",
+          "sourceKey": "session-stop:aui-screening-873a771a4d2ec01a"
+        },
+        {
+          "id": "session-start:aui-dashboard-34b897794c92ec04:2026-08-13T13:32:33.830Z",
+          "at": "2026-08-13T13:32:33.830Z",
+          "kind": "update",
+          "agent": "ui-dashboard:aui-das",
+          "detail": "started ui-dashboard:aui-das",
+          "sourceKey": "session-start:aui-dashboard-34b897794c92ec04"
+        },
+        {
+          "id": "session-stop:aui-screening-873a771a4d2ec01a:2026-08-13T13:32:36.443Z",
+          "at": "2026-08-13T13:32:36.443Z",
+          "kind": "completion",
+          "agent": "ui-screening:aui-scr",
+          "detail": "completed",
+          "sourceKey": "session-stop:aui-screening-873a771a4d2ec01a"
+        },
+        {
+          "id": "session-stop:aui-screening-873a771a4d2ec01a:2026-08-13T13:32:40.066Z",
+          "at": "2026-08-13T13:32:40.066Z",
+          "kind": "completion",
+          "agent": "ui-screening:aui-scr",
+          "detail": "completed",
+          "sourceKey": "session-stop:aui-screening-873a771a4d2ec01a"
+        },
+        {
+          "id": "session-stop:aui-screening-873a771a4d2ec01a:2026-08-13T13:32:45.425Z",
+          "at": "2026-08-13T13:32:45.425Z",
+          "kind": "completion",
+          "agent": "ui-screening:aui-scr",
+          "detail": "completed",
+          "sourceKey": "session-stop:aui-screening-873a771a4d2ec01a"
+        },
+        {
+          "id": "session-stop:aui-screening-873a771a4d2ec01a:2026-08-13T13:32:49.233Z",
+          "at": "2026-08-13T13:32:49.233Z",
+          "kind": "completion",
+          "agent": "ui-screening:aui-scr",
+          "detail": "completed",
+          "sourceKey": "session-stop:aui-screening-873a771a4d2ec01a"
+        }
+      ]
+    }
+  ]
+}
