@@ -100,8 +100,17 @@ export const api = {
   timeline: (accountExternalId: string) =>
     request<TimelineResponse>(`/timeline/${encodeURIComponent(accountExternalId)}`),
 
-  ledger: (page = 1, pageSize = 25) =>
-    request<LedgerPage>(`/ledger?page=${page}&page_size=${pageSize}`),
+  /**
+   * `violationsOnly` is what the dashboard's Recent Flags panel wants — a
+   * panel called "Recent Flags" must not list clean entries, and filtering
+   * the newest N in the browser would show an empty list whenever the last
+   * few screens happened to be clean.
+   */
+  ledger: (page = 1, pageSize = 25, violationsOnly = false) =>
+    request<LedgerPage>(
+      `/ledger?page=${page}&page_size=${pageSize}` +
+        (violationsOnly ? "&violations_only=true" : ""),
+    ),
 
   /** Powers "Verify Chain Integrity" — really recomputes every hash. */
   verifyLedger: () => request<VerifyResponse>("/ledger/verify", { method: "POST" }),

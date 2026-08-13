@@ -50,3 +50,6 @@ next-env.d.ts
 # Agent/session state
 .omc/
 .gstack/
+
+__pycache__/
+*.pyc

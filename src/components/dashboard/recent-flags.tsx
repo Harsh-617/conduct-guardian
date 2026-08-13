@@ -45,7 +45,11 @@ function ClearPill() {
 }
 
 export function RecentFlags({ delay = 0 }: { delay?: number }) {
-  const { data, loading, error, retry } = useApi(() => api.ledger(1, 5));
+  // violations_only: this panel is "Recent Flags", so a clean entry has no
+  // business in it. Filtered server-side rather than in the browser — the last
+  // five entries being clean would otherwise leave the panel empty while real
+  // violations sat one row below the cutoff.
+  const { data, loading, error, retry } = useApi(() => api.ledger(1, 5, true));
   const rows = (data?.entries ?? []).map(toLedgerRow);
 
   return (

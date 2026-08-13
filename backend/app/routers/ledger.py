@@ -22,14 +22,28 @@ MAX_PAGE_SIZE = 100
 async def list_ledger(
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1),
+    violations_only: bool = Query(
+        False,
+        description="Return only entries attesting a violation. Used by the dashboard's Recent Flags panel.",
+    ),
     session: AsyncSession = Depends(get_session),
 ) -> LedgerPage:
-    """Paginated ledger entries, newest first, with the rule/violation each attests."""
+    """Paginated ledger entries, newest first, with the rule/violation each attests.
+
+    `violations_only` exists because the dashboard's "Recent Flags" panel is
+    exactly that — flags. Filtering the newest N client-side would be wrong as
+    well as wasteful: if the last five entries happen to be clean you get an
+    empty "Recent Flags" list while violations sit one row below the cutoff.
+    """
     page_size = min(page_size, MAX_PAGE_SIZE)
 
-    total = (
-        await session.execute(select(func.count()).select_from(EvidenceLedgerEntry))
-    ).scalar_one()
+    count_stmt = select(func.count()).select_from(EvidenceLedgerEntry)
+    if violations_only:
+        count_stmt = count_stmt.join(
+            ScreeningResult,
+            ScreeningResult.id == EvidenceLedgerEntry.screening_result_id,
+        ).where(ScreeningResult.violation.is_(True))
+    total = (await session.execute(count_stmt)).scalar_one()
 
     # Joined through to the attested message so the ledger shows WHAT was said,
     # not just that something was hashed. The join is on the same FK chain the
@@ -51,9 +65,10 @@ async def list_ledger(
         .join(Message, Message.id == ScreeningResult.message_id)
         .join(Account, Account.id == Message.account_id)
         .order_by(EvidenceLedgerEntry.id.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
     )
+    if violations_only:
+        stmt = stmt.where(ScreeningResult.violation.is_(True))
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
     rows = (await session.execute(stmt)).all()
 
     entries = [
