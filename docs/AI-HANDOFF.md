@@ -5,7 +5,26 @@ building, which skill/agent handles which part, what's decided, and what's left.
 
 ---
 
-## 0. Identity & hard rules
+## 0. DEPLOYED — live URLs
+
+- **App (Vercel, never sleeps):** https://conduct-guardian-mu.vercel.app
+- **API (Render free tier, sleeps after ~15 min idle):** https://conduct-guardian-api.onrender.com
+- **Repo:** https://github.com/suryakumarisalive-art/conduct-guardian — `main` and
+  `real-backend` are the same commit. Vercel builds `main`.
+- Upstream (teammate's UI prototype): https://github.com/Harsh-617/conduct-guardian —
+  no PR opened yet; that is the user's call because it notifies him.
+
+**Deployment split and why:** Vercel serves the frontend because it does not sleep,
+so the UI paints instantly and shows the "waking up" state while the Render backend
+cold-starts (30-50s). Both-on-Render would leave a judge staring at nothing for 40
+seconds. Render runs the FastAPI backend with `--workers 1` — the rate limiter and
+coaching cache are in-process, so a second worker doubles the effective rate limit
+and makes cache hits a coin flip.
+
+**Before any demo:** open all 7 screens ~10 minutes ahead. Render sleeps, and
+/coaching takes ~5s cold while the LLM writes collector summaries.
+
+## 0b. Identity & hard rules
 
 - **Repo:** `C:\Users\surya\conduct-guardian` — a **brand-new, standalone project**.
 - **NOT related to SEOForge / `~/Projects/seoforage`.** Never merge, copy patterns wholesale,
