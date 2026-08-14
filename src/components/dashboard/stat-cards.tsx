@@ -2,15 +2,40 @@
 
 import { motion } from "framer-motion";
 import { AnimatedNumber } from "./animated-number";
+import { ErrorState, LoadingCards } from "@/components/ui/data-state";
+import { api } from "@/lib/api/client";
+import { useApi } from "@/lib/api/use-api";
+import type { DashboardStats } from "@/lib/api/types";
 
-const stats = [
-  { label: "Messages Screened Today", value: 247, decimals: 0, suffix: "" },
-  { label: "Violations Caught This Week", value: 12, decimals: 0, suffix: "" },
-  { label: "Agencies Monitored", value: 6, decimals: 0, suffix: "" },
-  { label: "Avg. Response Time", value: 1.2, decimals: 1, suffix: "s" },
-];
+function buildStats(stats: DashboardStats) {
+  return [
+    { label: "Messages Screened", value: stats.total_screened, decimals: 0, suffix: "" },
+    { label: "Violations Caught", value: stats.total_violations, decimals: 0, suffix: "" },
+    { label: "Active Accounts", value: stats.active_accounts, decimals: 0, suffix: "" },
+    { label: "Open Hardship Cases", value: stats.open_hardship_cases, decimals: 0, suffix: "" },
+  ];
+}
 
 export function StatCards({ sectionDelay = 0 }: { sectionDelay?: number }) {
+  const { data, loading, error, retry } = useApi(() => api.dashboardStats());
+
+  if (loading) return <LoadingCards cards={4} />;
+
+  if (error) {
+    return (
+      <ErrorState
+        message={error.message}
+        retryable={error.retryable}
+        onRetry={retry}
+        waking={error.code === "network_error"}
+      />
+    );
+  }
+
+  if (!data) return null;
+
+  const stats = buildStats(data);
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {stats.map((stat, index) => {

@@ -1,0 +1,23 @@
+# Conduct Guardian backend — Python 3.11+ (3.14.1 on the dev machine)
+
+fastapi==0.121.2
+uvicorn[standard]==0.42.0
+
+# ORM + migrations. psycopg 3 (not asyncpg) — better wheel coverage on new
+# Python releases and it handles Neon's required SSL with no extra config.
+SQLAlchemy[asyncio]==2.0.46
+psycopg[binary,pool]==3.2.12
+alembic==1.17.1
+
+# Settings + validation
+pydantic==2.12.4
+pydantic-settings==2.13.0
+
+# LLM
+groq==0.35.0
+
+# Tests
+pytest==8.4.2
+pytest-asyncio==1.3.0
+aiosqlite==0.21.0
+httpx==0.28.1

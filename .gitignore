@@ -46,3 +46,10 @@ next-env.d.ts
 
 # playwright
 .playwright-mcp/
+
+# Agent/session state
+.omc/
+.gstack/
+
+__pycache__/
+*.pyc

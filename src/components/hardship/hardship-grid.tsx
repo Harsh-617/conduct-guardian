@@ -2,13 +2,38 @@
 
 import { motion } from "framer-motion";
 import { HeartHandshake } from "lucide-react";
-import { hardshipAccounts } from "./data";
+import { EmptyState, ErrorState, LoadingRows } from "@/components/ui/data-state";
+import { api } from "@/lib/api/client";
+import { toHardshipAccount } from "@/lib/api/adapters";
+import { useApi } from "@/lib/api/use-api";
 import { SignalBadge } from "./signal-badge";
 
 export function HardshipGrid() {
+  const { data, loading, error, retry } = useApi(() => api.hardship(), []);
+
+  if (loading) return <LoadingRows rows={4} />;
+
+  if (error) {
+    return (
+      <ErrorState
+        message={error.message}
+        retryable={error.retryable}
+        onRetry={retry}
+        waking={error.code === "network_error"}
+      />
+    );
+  }
+
+  const accounts = (data?.rows ?? []).map(toHardshipAccount);
+
+  // No borrowers in distress is the good outcome here, not an error.
+  if (accounts.length === 0) {
+    return <EmptyState message="No hardship signals detected." />;
+  }
+
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      {hardshipAccounts.map((account, index) => (
+      {accounts.map((account, index) => (
         <motion.div
           key={account.id}
           initial={{ opacity: 0, y: 16 }}

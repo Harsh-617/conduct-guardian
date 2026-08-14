@@ -2,7 +2,10 @@
 
 import { motion } from "framer-motion";
 import { Minus, TrendingDown, TrendingUp } from "lucide-react";
-import { agencies } from "./data";
+import { EmptyState, ErrorState, LoadingRows } from "@/components/ui/data-state";
+import { api } from "@/lib/api/client";
+import { toAgency } from "@/lib/api/adapters";
+import { useApi } from "@/lib/api/use-api";
 import type { Trend } from "./data";
 
 function scoreColor(score: number) {
@@ -11,6 +14,10 @@ function scoreColor(score: number) {
   return "text-stamp-green";
 }
 
+// The backend keeps no score history (compliance_score is computed fresh on
+// every read), so `trend` is always "stable" — see toAgency(). This renders
+// the neutral state for every row rather than hiding the column, which keeps
+// the layout intact and doesn't pretend we know a direction we don't.
 function TrendIcon({ trend }: { trend: Trend }) {
   if (trend === "improving") {
     return (
@@ -37,6 +44,34 @@ function TrendIcon({ trend }: { trend: Trend }) {
 }
 
 export function AgencyTable() {
+  const { data, loading, error, retry } = useApi(() => api.agencies(), []);
+
+  if (loading) {
+    return (
+      <div className="rounded border border-hairline bg-card-white px-6 py-5">
+        <LoadingRows rows={5} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        message={error.message}
+        retryable={error.retryable}
+        onRetry={retry}
+        waking={error.code === "network_error"}
+      />
+    );
+  }
+
+  // Worst compliance first, same ordering the mock data used.
+  const agencies = (data?.rows ?? []).map(toAgency).sort((a, b) => a.score - b.score);
+
+  if (agencies.length === 0) {
+    return <EmptyState message="No agencies on file yet." />;
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}

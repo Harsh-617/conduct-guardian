@@ -4,14 +4,51 @@ import { Fragment, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle2, ChevronDown, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { officers } from "./data";
+import { EmptyState, ErrorState, LoadingRows } from "@/components/ui/data-state";
+import { api } from "@/lib/api/client";
+import { formatTimestamp, toOfficer } from "@/lib/api/adapters";
+import { useApi } from "@/lib/api/use-api";
 import { FlagBadge } from "./flag-badge";
 
 export function CoachingTable() {
   const [openId, setOpenId] = useState<string | null>(null);
+  const { data, loading, error, retry } = useApi(() => api.coaching(), []);
+
+  if (loading) {
+    return (
+      <div className="rounded border border-hairline bg-card-white px-6 py-5">
+        <LoadingRows rows={5} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        message={error.message}
+        retryable={error.retryable}
+        onRetry={retry}
+        waking={error.code === "network_error"}
+      />
+    );
+  }
+
+  // Worst-conduct officers surface first, same as the flag badge's colour cue.
+  const officers = (data?.rows ?? []).map(toOfficer).sort((a, b) => b.flags - a.flags);
+
+  if (officers.length === 0) {
+    return <EmptyState message="No collectors screened yet." />;
+  }
 
   return (
     <div className="rounded border border-hairline bg-card-white px-6 py-5">
+      {data && (
+        <div className="mb-4 flex items-center justify-end">
+          <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-navy-light">
+            {data.cached ? "Cached" : "Regenerated"} · {formatTimestamp(data.generated_at)}
+          </p>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] border-collapse text-left text-sm">
           <thead>
@@ -74,8 +111,15 @@ export function CoachingTable() {
                                   <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-navy-light">
                                     Recurring pattern
                                   </p>
-                                  <p className="mt-1.5 text-sm leading-relaxed text-ink-navy">
-                                    {officer.pattern}
+                                  <p
+                                    className={`mt-1.5 text-sm leading-relaxed ${
+                                      officer.pattern
+                                        ? "text-ink-navy"
+                                        : "italic text-navy-light"
+                                    }`}
+                                  >
+                                    {officer.pattern ??
+                                      "No pattern summary available for this collector."}
                                   </p>
                                   {officer.trainingModule && (
                                     <div className="mt-4">
@@ -94,7 +138,8 @@ export function CoachingTable() {
                                 <div className="flex items-center gap-3 rounded border border-stamp-green/30 bg-soft-green px-5 py-3.5">
                                   <CheckCircle2 className="h-4 w-4 shrink-0 text-stamp-green" />
                                   <p className="text-sm font-medium text-stamp-green">
-                                    {officer.note}
+                                    No issues this month — conduct patterns consistent
+                                    with best practice.
                                   </p>
                                 </div>
                               )}
