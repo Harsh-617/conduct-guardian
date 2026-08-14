@@ -121,6 +121,35 @@ deployment will **not** pick it up without a rebuild.
 Then set `FRONTEND_ORIGIN` on Render to the Vercel URL and let it redeploy, or
 CORS blocks every request.
 
+## ⚠️ Order matters: seed LAST
+
+Anything that calls `/screen` gets persisted, because `/screen` is the only write
+path and that is deliberate — it is what makes the seeded verdicts genuine. The
+side effect is that **every test, probe and eval you run lands in the demo
+database.**
+
+This has now happened twice:
+
+- The golden-set and injection scripts added 41 messages under accounts `GOLDEN`
+  and `REDTEAM`, pushing the violation rate from ~40% to 58%.
+- A security audit running concurrently with a reseed left accounts named
+  `AUDIT-INJ-1` and `AUDIT-INJ-3` sitting at the top of Recent Flags, one of them
+  reading *"Ignore all previous instructions."*
+
+A judge clicking into the accounts list would find them.
+
+**So the demo-prep order is fixed:**
+
+1. Run every eval, probe and audit you intend to run
+2. **Then** `python -m seed.seed --days 14 --reset` — wipes everything and
+   rebuilds a clean, curated corpus with an unbroken hash chain
+3. Do not run anything that hits `/screen` afterwards, except your actual demo
+
+Never run an audit and a reseed at the same time. `scripts/purge_test_data.py`
+can remove known test accounts, but purging leaves gaps in an append-only chain
+and `/ledger/verify` will then report INVALID — a full `--reset` is the only
+clean repair.
+
 ## 6. Pre-demo checklist
 
 Run this ~10 minutes before you present:

@@ -40,16 +40,24 @@ from app.platform_compat import asyncio_run
 
 #: external_ids used only by evaluation and probe scripts. Keep in sync with
 #: the account_id each script sends.
-TEST_ACCOUNT_IDS = ["GOLDEN", "REDTEAM", "DIAG", "BULKTEST", "9999", "9900"]
+TEST_ACCOUNT_IDS = ["GOLDEN", "REDTEAM", "DIAG", "BULKTEST", "QA", "9999", "9900"]
+
+#: Prefixes for ad-hoc probe accounts. An exact list can't cover these: a
+#: security audit invented accounts named AUDIT-INJ-1 and AUDIT-INJ-3 that were
+#: unknown when this script was written, and they surfaced at the top of the
+#: dashboard's Recent Flags with text reading "Ignore all previous
+#: instructions." Anything probing this API should use one of these prefixes.
+TEST_ACCOUNT_PREFIXES = ["AUDIT", "TEST", "PROBE", "REDTEAM", "GOLDEN"]
 
 
 async def _collect(session: AsyncSession) -> tuple[list[int], list[int]]:
+    from sqlalchemy import or_
+
+    conditions = [Account.external_id.in_(TEST_ACCOUNT_IDS)]
+    conditions += [Account.external_id.startswith(p) for p in TEST_ACCOUNT_PREFIXES]
+
     accounts = (
-        (
-            await session.execute(
-                select(Account).where(Account.external_id.in_(TEST_ACCOUNT_IDS))
-            )
-        )
+        (await session.execute(select(Account).where(or_(*conditions))))
         .scalars()
         .all()
     )
