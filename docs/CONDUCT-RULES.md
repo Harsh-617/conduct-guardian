@@ -37,7 +37,7 @@ to have a document we don't have, and it shows the rule pack is deliberately plu
 | `R1_ABUSIVE_LANGUAGE` | No abusive, humiliating, or intimidating language | Insults, slurs, degrading characterisations of the borrower | BNM fair debt collection |
 | `R2_THREATS` | No threats, scare tactics, or threatened illegal action | Threatened violence, arrest, property seizure without legal basis, trespass | BNM fair debt collection |
 | `R3_FALSE_LEGAL_CLAIM` | No misrepresenting legal consequences or authority | Claiming imminent arrest/jail/court action that isn't real; implying police powers | Act 873 fair-dealing intent |
-| `R4_THIRD_PARTY_DISCLOSURE` | Debt must not be disclosed to third parties | Naming/threatening to tell employer, family, neighbours, friends | BNM: deal with the borrower directly |
+| `R4_THIRD_PARTY_DISCLOSURE` | Debt must not be disclosed to third parties | Naming/threatening to tell employer, family, neighbours, friends. Co-signers and guarantors are not third parties — contacting them is legitimate | BNM: deal with the borrower directly |
 | `R5_CONTACT_FREQUENCY` | **Max 3 contacts per week** | Computed, not LLM-judged — see below | BNM: no more than 3 calls/week |
 | `R6_IMPERSONATION` | No impersonating officials, lawyers, or law enforcement | "This is from the court", fake officer titles | Act 873 fair-dealing intent |
 | `R7_PRIVACY` | Borrower privacy and dignity must be protected | Publicising the debt, shaming, sharing personal data | Act 873; BNM privacy/human-rights framing |

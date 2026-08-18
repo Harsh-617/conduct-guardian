@@ -57,7 +57,10 @@ RULES: tuple[Rule, ...] = (
         title="Debt must not be disclosed to third parties",
         looks_for=(
             "Naming, contacting, or threatening to tell the borrower's employer, "
-            "family, neighbours, or friends about the debt."
+            "family, neighbours, or friends about the debt. Co-signers and "
+            "guarantors on the loan are not third parties — they are legitimate "
+            "parties to the debt, and contacting them about it is normal "
+            "collections practice, not a violation."
         ),
         source="BNM: collectors must deal with the borrower directly",
     ),

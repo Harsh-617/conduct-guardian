@@ -181,9 +181,9 @@ GOLDEN_CASES: list[GoldenCase] = [
         "note": (
             "Looks like R4 third-party disclosure at a glance, but a "
             "co-signing guarantor is a legitimate party to the debt, not an "
-            "unrelated third party — judged clean. A stricter reviewer "
-            "could still flag it, since the rule text doesn't explicitly "
-            "carve out guarantors."
+            "unrelated third party — judged clean. R4's rule text now "
+            "explicitly carves out co-signers and guarantors, so this "
+            "should no longer be a close call for the model."
         ),
     },
 ]

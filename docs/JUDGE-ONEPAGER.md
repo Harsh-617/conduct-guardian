@@ -45,12 +45,18 @@ post-swap run of `scripts.eval_golden_set` against both models.
 
 | Metric | `openai/gpt-oss-20b` (live) | `openai/gpt-oss-120b` (bulk) |
 |---|---|---|
-| Precision / Recall / F1 | 90.9% / 100% / 95.2% | 91.7% / 100% / 95.7% |
-| False negatives | 0 | 0 |
-| False positives | 1 — GS-20, a co-signing guarantor treated as third party | 1 — same case, GS-20 |
-| Correct rule on true positives | 9/10 | 9/11 |
-| Cases scored | 19/20 (GS-17 errored: transient 503) | 20/20 |
-| Latency p50 / p95 / max | 5,108 / 14,221 / 14,221 ms | 9,400 / 12,339 / 12,339 ms |
+| Precision / Recall / F1 | 100% / 90.9% / 95.2% | 91.7% / 100% / 95.7% |
+| False negatives | 1 — GS-19, a vague ("take this all the way") threat | 0 |
+| False positives | 0 | 1 — GS-20, a co-signing guarantor treated as third party |
+| Correct rule on true positives | 8/10 | 9/11 |
+| Cases scored | 20/20 | 20/20 |
+| Latency p50 / p95 / max | 10,011 / 13,706 / 13,706 ms | 9,400 / 12,339 / 12,339 ms |
+
+**Re-measured again 2026-08-19** for `gpt-oss-20b` only, after `R4_THIRD_PARTY_DISCLOSURE`
+was rewritten to explicitly exclude co-signers and guarantors from "third parties"
+(`backend/app/rules.py`, `docs/CONDUCT-RULES.md`). GS-20 no longer false-positives on the
+live model — the `openai/gpt-oss-20b` column above reflects that re-run. The `openai/gpt-oss-120b`
+column is the pre-fix run and has not been re-measured against the corrected rule text.
 
 Two things worth calling out plainly, not burying:
 
