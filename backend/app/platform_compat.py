@@ -28,10 +28,14 @@ def asyncio_run(coro: Coroutine[Any, Any, T]) -> T:
     """`asyncio.run` that psycopg can use on Windows.
 
     Uses `loop_factory` (Python 3.12+) rather than the event-loop policy API,
-    which is deprecated from 3.14 — this stays warning-free.
+    which is deprecated from 3.14 — this stays warning-free. `loop_factory`
+    doesn't exist before 3.12, so older interpreters fall back to the policy
+    API via `ensure_selector_event_loop_policy`, same as uvicorn does.
     """
     if IS_WINDOWS:
-        return asyncio.run(coro, loop_factory=asyncio.SelectorEventLoop)
+        if sys.version_info >= (3, 12):
+            return asyncio.run(coro, loop_factory=asyncio.SelectorEventLoop)
+        ensure_selector_event_loop_policy()
     return asyncio.run(coro)
 
 
