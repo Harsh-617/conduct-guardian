@@ -32,26 +32,48 @@ Next.js frontend (Vercel)  ──HTTPS/JSON──►  FastAPI backend (Render)
 
 All figures below were produced by scripts in the repo and are reproducible.
 
-**⚠️ Stale as of the Groq model swap:** `llama-3.3-70b-versatile` and
-`llama-3.1-8b-instant`, named in the "Notes" column below, were removed from
-Groq's catalog and replaced with `openai/gpt-oss-120b` / `openai/gpt-oss-20b`
-(see `docs/DEPLOY.md`). The model-specific numbers below (agreement,
-precision/recall/F1, latency) predate that swap and have not been
-re-measured — rerun the commands in "Reproduce any number above" for current
-figures before citing these.
+**Re-measured 2026-08-19** after Groq removed `llama-3.3-70b-versatile` and
+`llama-3.1-8b-instant` from its catalog (see `docs/DEPLOY.md`). The app now
+runs on `openai/gpt-oss-120b` (full) / `openai/gpt-oss-20b` (bulk); the
+golden-set numbers below are from `scripts.eval_golden_set` run against both.
+
+**Golden-set breakdown, both current models, 20 curated cases:**
+
+| Metric | `openai/gpt-oss-120b` (full) | `openai/gpt-oss-20b` (bulk) |
+|---|---|---|
+| Precision / Recall / F1 | 90.0% / 90.0% / 90.0% | 90.9% / 100% / 95.2% |
+| False negatives | 1 — GS-19, a deliberately vague escalation threat | 0 |
+| False positives | 1 — GS-20, a co-signing guarantor treated as third party | 1 — same case, GS-20 |
+| Correct rule on true positives | 8/9 | 8/10 |
+| Cases scored | 19/20 (GS-13 errored: transient 500) | 19/20 (GS-17 errored: transient 503) |
+| Latency p50 / p95 / max | 7,667 / 14,619 / 14,619 ms | 6,267 / 11,424 / 11,424 ms |
+
+Two things worth calling out plainly, not burying:
+
+- **The bulk model scored *higher* than the full model** on this set (95.2%
+  vs 90.0% F1) — the reverse of the old llama pair, where the bulk model was
+  the weaker one. Sample is only 19-20 cases, so don't over-read the ranking,
+  but the old assumption "full model is the safe/accurate choice, bulk is a
+  cheaper compromise" no longer holds unqualified for this model pair.
+- **Latency is far higher than the old figure.** The previous `947 ms`
+  end-to-end number was measured on `llama-3.3-70b`, which ran on Groq's LPU
+  hardware. Both current models measured **6.3–7.7 seconds p50**, roughly an
+  order of magnitude slower — plan live-demo pacing around this, not the old
+  number.
 
 | Metric | Result | Notes |
 |---|---|---|
-| Agreement with human labels | **96.6%** | llama-3.3-70b (deprecated), 59 collector messages |
-| Golden-set precision / recall / F1 | **91.7% / 100% / 95.7%** | llama-3.1-8b (deprecated), 20 curated cases |
-| **False negatives** | **0** | No real violation missed — the right way to err |
-| False positives | 1 | A co-signing guarantor case; arguably a legitimate party |
-| Prompt-injection battery | **7 / 7 held** | Incl. forged delimiter, Malay-language override, invented rule ID |
+| Agreement with human labels | **97.0%** binary / 91.0% exact rule | `openai/gpt-oss-20b` (bulk), seed run, 67 collector messages |
+| Prompt-injection battery | **7 / 7 held** | Incl. forged delimiter, Malay-language override, invented rule ID — not re-run against current models, see note below |
 | Invalid rule IDs returned | **0** | Post-validation rejects anything not in the pack |
-| Live screening latency | **947 ms** | llama-3.3-70b (deprecated), end to end |
-| Seeded corpus | **75 / 75**, 0 failures | Every verdict from the real endpoint |
+| Seeded corpus | **75 / 75** messages screened | 73/75 succeeded on first response; 2 landed on retry after a transient 500 — see full seeding run |
 | Evidence ledger | **valid**, 0 broken rows | Rehashed from stored payloads |
-| Automated tests | **27 passing** | Incl. direct-`UPDATE` tamper detection |
+| Automated tests | **32 passing** | Incl. direct-`UPDATE` tamper detection |
+
+The prompt-injection battery (`scripts.probe_injection`) has not been re-run
+against the current models as part of this update — its 7/7 figure still
+dates to the deprecated llama pair. Re-run it before citing that number
+against the current models.
 
 ## Where the rules come from
 
@@ -72,7 +94,7 @@ Stated up front rather than discovered under questioning.
 - **Call transcripts are typed text "as if transcribed".** No audio ingestion.
 - **No production auth, no multi-tenancy.** Both explicitly out of scope.
 - **All data is synthetic.** No real borrower, collector, or agency data is used anywhere, ever.
-- The bulk model (`openai/gpt-oss-20b`) is used for seeding only; live screening runs on the full model (`openai/gpt-oss-120b`). The 85.5% vs 96.6% agreement gap cited in earlier versions of this doc was measured on the now-deprecated llama pair and has not been re-verified for the current models.
+- The bulk model (`openai/gpt-oss-20b`) is used for seeding only; live screening runs on the full model (`openai/gpt-oss-120b`) — that's a cost/latency choice, not an accuracy one. On the 20-case golden set the bulk model actually scored higher (95.2% F1 vs 90.0%; see breakdown above), reversing the old llama pair's relationship. Too small a sample to re-architect around, but don't repeat the old "full model is strictly more accurate" claim as if it still holds.
 
 ## Reproduce any number above
 
