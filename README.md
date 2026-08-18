@@ -26,7 +26,7 @@ Screens every collector→customer message against a conduct rule pack, flags vi
 ```
 Next.js (Vercel)  ──HTTPS/JSON──►  FastAPI (Render)
    7 screens                            │
-                              Groq · Llama 3.3 70B
+                          Groq · openai/gpt-oss-120b
                                         │
                                 Postgres (Neon, Singapore)
                          messages · screening_results
@@ -39,10 +39,15 @@ Next.js (Vercel)  ──HTTPS/JSON──►  FastAPI (Render)
 
 Reproducible from scripts in this repo.
 
+**⚠️** The model-specific rows below predate Groq deprecating
+`llama-3.3-70b-versatile` / `llama-3.1-8b-instant`; the app now runs on
+`openai/gpt-oss-120b` / `openai/gpt-oss-20b` (see `docs/DEPLOY.md`) and these
+figures have not been re-measured against them.
+
 | Metric | Result |
 |---|---|
-| Agreement with human labels | **96.6%** (llama-3.3-70b, 59 messages) |
-| Golden-set precision / recall / F1 | **91.7% / 100% / 95.7%** (20 curated cases) |
+| Agreement with human labels | **96.6%** (llama-3.3-70b, deprecated, 59 messages) |
+| Golden-set precision / recall / F1 | **91.7% / 100% / 95.7%** (llama-3.1-8b, deprecated, 20 curated cases) |
 | **False negatives** | **0** — no real violation missed |
 | Prompt-injection battery | **7 / 7 held** |
 | Invalid rule IDs returned | **0** |
@@ -116,7 +121,7 @@ Stated up front rather than discovered under questioning.
 - **The rate limiter is in-process** — it resets on restart and does not coordinate across replicas. The service runs a single worker deliberately, because the limiter and the coaching cache both live in memory.
 - **Call transcripts are typed text "as if transcribed".** No audio ingestion.
 - **No production auth, no multi-tenancy.** Both explicitly out of scope for this phase.
-- **Groq's free tier caps llama-3.3-70b at ~100k tokens/day**, roughly 70 screenings. Bulk seeding uses llama-3.1-8b-instant, which is materially weaker (85.5% vs 96.6% agreement). Every verdict records which model produced it.
+- **Groq's free tier caps `openai/gpt-oss-120b` at 8,000 tokens/minute** (see `docs/DEPLOY.md`). Bulk seeding uses the smaller `openai/gpt-oss-20b`; agreement rates for the current model pair haven't been re-benchmarked since the earlier `llama-3.3-70b`/`llama-3.1-8b` figures no longer apply — rerun `scripts/eval_golden_set.py` for current numbers. Every verdict records which model produced it.
 
 ## Credits
 

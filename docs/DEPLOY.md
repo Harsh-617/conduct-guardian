@@ -26,27 +26,36 @@ it's shown once. That's `GROQ_API_KEY`.
 
 ### ⚠️ The token budget is the real constraint — plan around it
 
+`llama-3.3-70b-versatile` and `llama-3.1-8b-instant` (the models this doc used
+to name here) were removed from Groq's catalog entirely — calls to them now
+404, not throttle. The app has been repointed at their current replacements,
+`openai/gpt-oss-120b` (full) and `openai/gpt-oss-20b` (bulk).
+
 The advertised "14,400 requests/day" is not the limit that bites. The one that
-does, measured live on this account:
+does, measured live on this account against the current models:
 
 | Model | Free-tier cap | What that means here |
 |---|---|---|
-| `llama-3.3-70b-versatile` | **100,000 tokens per DAY** | ~70 screening calls/day. **One 75-message seed run exhausts it.** |
-| `llama-3.1-8b-instant` | Much larger budget | Used for bulk seeding |
+| `openai/gpt-oss-120b` | **8,000 tokens per MINUTE**, 1,000 requests/min | A handful of real (system-prompt-heavy) screens can trip this. |
+| `openai/gpt-oss-20b` | Same caps on this account | Used for bulk seeding |
 
-We hit this for real: `Rate limit reached ... on tokens per day (TPD): Limit
-100000, Used 99175`. Every `/screen` call carries the full rule pack and JSON
-schema in its system prompt, so calls are token-heavy.
+This is a per-minute window, not the old per-day one — measured via the
+`x-ratelimit-*` response headers on a trivial call, not a full-size screening
+call, so treat the reset timing as roughly a minute rather than a precise
+number. Re-check those headers directly if Groq changes free-tier terms
+again rather than trusting this table blind. Every `/screen` call carries the
+full rule pack and JSON schema in its system prompt, so a single real call can
+consume a meaningful slice of the 8K/min budget; `seed.seed`'s
+`MAX_CONCURRENCY = 2` plus its retry/backoff loop exists specifically to ride
+out this window rather than race it.
 
 **Consequences you must plan around:**
 
 - **Seed with the bulk model.** `seed.seed` does this by default —
   `use_bulk_model: true` on each request. Don't pass `--full-model` unless you
-  have a specific reason; it will eat the day's 70B budget in one run.
-- **Budget ~70 live 70B screens per day.** Rehearsal burns the same pool as the
-  pitch. If you rehearse hard in the morning you can be throttled by afternoon.
-- **Seed the day BEFORE if you can**, or early enough that the rolling window
-  recovers.
+  have a specific reason; it burns the same per-minute pool the live demo needs.
+- **A burst of live screens can throttle you mid-demo.** The window is roughly
+  a minute, so pause and retry rather than panicking.
 - The `model` column on every `screening_result` records which model produced
   that verdict, so the mix is auditable rather than hidden.
 

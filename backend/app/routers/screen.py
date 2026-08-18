@@ -107,9 +107,10 @@ async def screen(
         )
 
     # Bulk seeding uses the cheaper model: Groq's free tier caps
-    # llama-3.3-70b at 100k tokens PER DAY, which a single 75-message seed run
-    # would exhaust — leaving nothing for the live demo. 3.1-8b-instant has its
-    # own budget, and every verdict records which model produced it.
+    # openai/gpt-oss-120b at 8,000 tokens PER MINUTE, which a burst of live
+    # screening calls can exhaust — leaving nothing for the demo mid-pitch.
+    # openai/gpt-oss-20b has its own budget, and every verdict records which
+    # model produced it.
     model_used = settings.groq_model_bulk if payload.use_bulk_model else settings.groq_model
 
     try:

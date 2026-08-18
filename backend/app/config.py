@@ -20,8 +20,8 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:3000"
     seed_token: str = ""
 
-    groq_model: str = "llama-3.3-70b-versatile"
-    groq_model_bulk: str = "llama-3.1-8b-instant"
+    groq_model: str = "openai/gpt-oss-120b"
+    groq_model_bulk: str = "openai/gpt-oss-20b"
 
     # 30/min, not 10: on stage you may screen half a dozen examples and a judge
     # may then try several of their own. A 429 mid-pitch reads as "it's broken"

@@ -13,7 +13,7 @@ trade-off is a product decision, not an accuracy number.
 Run with the API up:
 
     ./.venv/Scripts/python.exe -m scripts.eval_golden_set
-    ./.venv/Scripts/python.exe -m scripts.eval_golden_set --model llama-3.1-8b-instant
+    ./.venv/Scripts/python.exe -m scripts.eval_golden_set --bulk
 """
 
 from __future__ import annotations
@@ -149,7 +149,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--bulk",
         action="store_true",
-        help="Use GROQ_MODEL_BULK. Needed when the 70b daily token budget is spent.",
+        help="Use GROQ_MODEL_BULK. Needed when the full model's per-minute token budget is spent.",
     )
     args = parser.parse_args()
     asyncio_run(main(args.base_url, args.bulk))

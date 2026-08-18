@@ -19,7 +19,7 @@ Screens every collector→customer message against a conduct rule pack, flags vi
 ```
 Next.js frontend (Vercel)  ──HTTPS/JSON──►  FastAPI backend (Render)
      7 screens                                       │
-                                          Groq · Llama 3.3 70B
+                                     Groq · openai/gpt-oss-120b
                                                      │
                                             Postgres (Neon)
                                      messages · screening_results
@@ -32,15 +32,23 @@ Next.js frontend (Vercel)  ──HTTPS/JSON──►  FastAPI backend (Render)
 
 All figures below were produced by scripts in the repo and are reproducible.
 
+**⚠️ Stale as of the Groq model swap:** `llama-3.3-70b-versatile` and
+`llama-3.1-8b-instant`, named in the "Notes" column below, were removed from
+Groq's catalog and replaced with `openai/gpt-oss-120b` / `openai/gpt-oss-20b`
+(see `docs/DEPLOY.md`). The model-specific numbers below (agreement,
+precision/recall/F1, latency) predate that swap and have not been
+re-measured — rerun the commands in "Reproduce any number above" for current
+figures before citing these.
+
 | Metric | Result | Notes |
 |---|---|---|
-| Agreement with human labels | **96.6%** | llama-3.3-70b, 59 collector messages |
-| Golden-set precision / recall / F1 | **91.7% / 100% / 95.7%** | llama-3.1-8b, 20 curated cases |
+| Agreement with human labels | **96.6%** | llama-3.3-70b (deprecated), 59 collector messages |
+| Golden-set precision / recall / F1 | **91.7% / 100% / 95.7%** | llama-3.1-8b (deprecated), 20 curated cases |
 | **False negatives** | **0** | No real violation missed — the right way to err |
 | False positives | 1 | A co-signing guarantor case; arguably a legitimate party |
 | Prompt-injection battery | **7 / 7 held** | Incl. forged delimiter, Malay-language override, invented rule ID |
 | Invalid rule IDs returned | **0** | Post-validation rejects anything not in the pack |
-| Live screening latency | **947 ms** | llama-3.3-70b, end to end |
+| Live screening latency | **947 ms** | llama-3.3-70b (deprecated), end to end |
 | Seeded corpus | **75 / 75**, 0 failures | Every verdict from the real endpoint |
 | Evidence ledger | **valid**, 0 broken rows | Rehashed from stored payloads |
 | Automated tests | **27 passing** | Incl. direct-`UPDATE` tamper detection |
@@ -64,7 +72,7 @@ Stated up front rather than discovered under questioning.
 - **Call transcripts are typed text "as if transcribed".** No audio ingestion.
 - **No production auth, no multi-tenancy.** Both explicitly out of scope.
 - **All data is synthetic.** No real borrower, collector, or agency data is used anywhere, ever.
-- The bulk model (llama-3.1-8b) is materially weaker than llama-3.3-70b — 85.5% vs 96.6% agreement. It is used for seeding only; live screening runs on 70B.
+- The bulk model (`openai/gpt-oss-20b`) is used for seeding only; live screening runs on the full model (`openai/gpt-oss-120b`). The 85.5% vs 96.6% agreement gap cited in earlier versions of this doc was measured on the now-deprecated llama pair and has not been re-verified for the current models.
 
 ## Reproduce any number above
 

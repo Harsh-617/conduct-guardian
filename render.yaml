@@ -34,9 +34,9 @@ services:
       - key: SEED_TOKEN
         generateValue: true
       - key: GROQ_MODEL
-        value: llama-3.3-70b-versatile
+        value: openai/gpt-oss-120b
       - key: GROQ_MODEL_BULK
-        value: llama-3.1-8b-instant
+        value: openai/gpt-oss-20b
       - key: RATE_LIMIT_REQUESTS
         value: "30"
       - key: COACHING_CACHE_MINUTES

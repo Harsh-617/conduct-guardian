@@ -62,8 +62,9 @@ class LLMClient(Protocol):
 _NO_JSON_SCHEMA: set[str] = set()
 
 # Compact, not pretty-printed. This string is prepended to every single
-# screening call, and Groq's free tier caps llama-3.3-70b at 100k tokens PER
-# DAY — indenting the schema for human readability costs real demo capacity.
+# screening call, and Groq's free tier caps openai/gpt-oss-120b at 8,000
+# tokens PER MINUTE — indenting the schema for human readability costs real
+# demo capacity.
 _SCHEMA_INSTRUCTION = (
     "\n\nReturn ONLY a single JSON object matching this schema. "
     "No markdown fences, no commentary:\n{schema}"
@@ -74,9 +75,11 @@ class GroqLLMClient:
     """Production `LLMClient`, backed by the real Groq API.
 
     Prefers strict structured output (`response_format: json_schema`) and falls
-    back to JSON Object Mode when the model rejects it. As of this build, none
-    of the models available on the project's Groq tier accept `json_schema` —
-    llama-3.3-70b and llama-3.1-8b both 400 on it and work with `json_object`.
+    back to JSON Object Mode when the model rejects it outright (the old
+    llama-3.3-70b and llama-3.1-8b both did). Whether the current models
+    (openai/gpt-oss-120b / -20b) need the fallback is discovered at runtime via
+    `_NO_JSON_SCHEMA` rather than assumed here — Groq's structured-output
+    support varies by model and changes over time.
 
     The schema is ALSO rendered into the system prompt on every request, not
     just on the fallback path. Under JSON Object Mode the API guarantees valid
