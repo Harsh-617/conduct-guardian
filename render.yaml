@@ -34,9 +34,9 @@ services:
       - key: SEED_TOKEN
         generateValue: true
       - key: GROQ_MODEL
-        value: openai/gpt-oss-120b
-      - key: GROQ_MODEL_BULK
         value: openai/gpt-oss-20b
+      - key: GROQ_MODEL_BULK
+        value: openai/gpt-oss-120b
       - key: RATE_LIMIT_REQUESTS
         value: "30"
       - key: COACHING_CACHE_MINUTES

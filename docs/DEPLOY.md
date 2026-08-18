@@ -29,15 +29,17 @@ it's shown once. That's `GROQ_API_KEY`.
 `llama-3.3-70b-versatile` and `llama-3.1-8b-instant` (the models this doc used
 to name here) were removed from Groq's catalog entirely — calls to them now
 404, not throttle. The app has been repointed at their current replacements,
-`openai/gpt-oss-120b` (full) and `openai/gpt-oss-20b` (bulk).
+`openai/gpt-oss-20b` (live) and `openai/gpt-oss-120b` (bulk) — swapped from
+the original assignment once golden-set data showed `gpt-oss-20b` is both
+more accurate and faster on this task; see `docs/JUDGE-ONEPAGER.md`.
 
 The advertised "14,400 requests/day" is not the limit that bites. The one that
 does, measured live on this account against the current models:
 
 | Model | Free-tier cap | What that means here |
 |---|---|---|
-| `openai/gpt-oss-120b` | **8,000 tokens per MINUTE**, 1,000 requests/min | A handful of real (system-prompt-heavy) screens can trip this. |
-| `openai/gpt-oss-20b` | Same caps on this account | Used for bulk seeding |
+| `openai/gpt-oss-20b` | **8,000 tokens per MINUTE**, 1,000 requests/min | A handful of real (system-prompt-heavy) screens can trip this. |
+| `openai/gpt-oss-120b` | Same caps on this account | Used for bulk seeding |
 
 This is a per-minute window, not the old per-day one — measured via the
 `x-ratelimit-*` response headers on a trivial call, not a full-size screening

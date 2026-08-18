@@ -37,7 +37,7 @@ from seed.sample_data import ACCOUNTS, AGENCIES, COLLECTORS, PlannedMessage, bui
 DEFAULT_BASE_URL = "http://127.0.0.1:8000"
 # 2, not 4: the screening system prompt carries the full rule pack plus the
 # JSON schema, so each call is token-heavy relative to Groq's free-tier cap
-# (8,000 tokens/minute on openai/gpt-oss-20b, measured live — see
+# (8,000 tokens/minute on openai/gpt-oss-120b, measured live — see
 # docs/DEPLOY.md). Higher concurrency trips it and messages start failing.
 MAX_CONCURRENCY = 2
 MAX_RETRIES = 4
@@ -313,7 +313,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--full-model",
         action="store_true",
         help=(
-            "Seed with GROQ_MODEL (openai/gpt-oss-120b) instead of the bulk model. "
+            "Seed with GROQ_MODEL (openai/gpt-oss-20b) instead of the bulk model. "
             "Groq's free tier caps it at 8,000 tokens PER MINUTE, so a seed run "
             "can starve the live demo of budget. Rarely what you want."
         ),

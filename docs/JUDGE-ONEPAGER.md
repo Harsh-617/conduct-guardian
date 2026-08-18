@@ -19,7 +19,7 @@ Screens every collector→customer message against a conduct rule pack, flags vi
 ```
 Next.js frontend (Vercel)  ──HTTPS/JSON──►  FastAPI backend (Render)
      7 screens                                       │
-                                     Groq · openai/gpt-oss-120b
+                                     Groq · openai/gpt-oss-20b
                                                      │
                                             Postgres (Neon)
                                      messages · screening_results
@@ -33,37 +33,43 @@ Next.js frontend (Vercel)  ──HTTPS/JSON──►  FastAPI backend (Render)
 All figures below were produced by scripts in the repo and are reproducible.
 
 **Re-measured 2026-08-19** after Groq removed `llama-3.3-70b-versatile` and
-`llama-3.1-8b-instant` from its catalog (see `docs/DEPLOY.md`). The app now
-runs on `openai/gpt-oss-120b` (full) / `openai/gpt-oss-20b` (bulk); the
-golden-set numbers below are from `scripts.eval_golden_set` run against both.
+`llama-3.1-8b-instant` from its catalog (see `docs/DEPLOY.md`), then re-run
+once more the same day after swapping which model powers which role: the
+first pass had `groq_model` (live screening) on `openai/gpt-oss-120b` and
+`groq_model_bulk` (seeding) on `openai/gpt-oss-20b`. That assignment had it
+backwards — `gpt-oss-20b` scored as well or better and was consistently
+faster — so the roles are now reversed. The table below is the final
+post-swap run of `scripts.eval_golden_set` against both models.
 
 **Golden-set breakdown, both current models, 20 curated cases:**
 
-| Metric | `openai/gpt-oss-120b` (full) | `openai/gpt-oss-20b` (bulk) |
+| Metric | `openai/gpt-oss-20b` (live) | `openai/gpt-oss-120b` (bulk) |
 |---|---|---|
-| Precision / Recall / F1 | 90.0% / 90.0% / 90.0% | 90.9% / 100% / 95.2% |
-| False negatives | 1 — GS-19, a deliberately vague escalation threat | 0 |
+| Precision / Recall / F1 | 90.9% / 100% / 95.2% | 91.7% / 100% / 95.7% |
+| False negatives | 0 | 0 |
 | False positives | 1 — GS-20, a co-signing guarantor treated as third party | 1 — same case, GS-20 |
-| Correct rule on true positives | 8/9 | 8/10 |
-| Cases scored | 19/20 (GS-13 errored: transient 500) | 19/20 (GS-17 errored: transient 503) |
-| Latency p50 / p95 / max | 7,667 / 14,619 / 14,619 ms | 6,267 / 11,424 / 11,424 ms |
+| Correct rule on true positives | 9/10 | 9/11 |
+| Cases scored | 19/20 (GS-17 errored: transient 503) | 20/20 |
+| Latency p50 / p95 / max | 5,108 / 14,221 / 14,221 ms | 9,400 / 12,339 / 12,339 ms |
 
 Two things worth calling out plainly, not burying:
 
-- **The bulk model scored *higher* than the full model** on this set (95.2%
-  vs 90.0% F1) — the reverse of the old llama pair, where the bulk model was
-  the weaker one. Sample is only 19-20 cases, so don't over-read the ranking,
-  but the old assumption "full model is the safe/accurate choice, bulk is a
-  cheaper compromise" no longer holds unqualified for this model pair.
+- **Accuracy is close to a tie (95.2% vs 95.7% F1); latency is not.** Both
+  models land in the mid-90s on F1 over a 19-20 case sample — too small a
+  gap, and too small a sample, to call one strictly more accurate. Latency
+  is the real difference: the live model's p50 (5.1s) is roughly half the
+  bulk model's (9.4s). That's why `groq_model` now points at `gpt-oss-20b` —
+  for the live UI, response time matters as much as the score, and seeding
+  is not latency-sensitive.
 - **Latency is far higher than the old figure.** The previous `947 ms`
   end-to-end number was measured on `llama-3.3-70b`, which ran on Groq's LPU
-  hardware. Both current models measured **6.3–7.7 seconds p50**, roughly an
+  hardware. Both current models measured **5.1–9.4 seconds p50**, roughly an
   order of magnitude slower — plan live-demo pacing around this, not the old
   number.
 
 | Metric | Result | Notes |
 |---|---|---|
-| Agreement with human labels | **97.0%** binary / 91.0% exact rule | `openai/gpt-oss-20b` (bulk), seed run, 67 collector messages |
+| Agreement with human labels | **97.0%** binary / 91.0% exact rule | `openai/gpt-oss-20b`, seed run, 67 collector messages — measured *before* the role swap, when this model was still the bulk model; re-run `seed.seed` for a current number against `openai/gpt-oss-120b` (now bulk) |
 | Prompt-injection battery | **7 / 7 held** | Incl. forged delimiter, Malay-language override, invented rule ID — not re-run against current models, see note below |
 | Invalid rule IDs returned | **0** | Post-validation rejects anything not in the pack |
 | Seeded corpus | **75 / 75** messages screened | 73/75 succeeded on first response; 2 landed on retry after a transient 500 — see full seeding run |
@@ -94,7 +100,7 @@ Stated up front rather than discovered under questioning.
 - **Call transcripts are typed text "as if transcribed".** No audio ingestion.
 - **No production auth, no multi-tenancy.** Both explicitly out of scope.
 - **All data is synthetic.** No real borrower, collector, or agency data is used anywhere, ever.
-- The bulk model (`openai/gpt-oss-20b`) is used for seeding only; live screening runs on the full model (`openai/gpt-oss-120b`) — that's a cost/latency choice, not an accuracy one. On the 20-case golden set the bulk model actually scored higher (95.2% F1 vs 90.0%; see breakdown above), reversing the old llama pair's relationship. Too small a sample to re-architect around, but don't repeat the old "full model is strictly more accurate" claim as if it still holds.
+- Live screening runs on `openai/gpt-oss-20b`; the bulk model (`openai/gpt-oss-120b`) is used for seeding only. This is the reverse of the pair's original assignment — swapped after golden-set data showed `gpt-oss-20b` matching the larger model on accuracy (95.2% vs 95.7% F1; see breakdown above) while being roughly twice as fast at p50 (5.1s vs 9.4s), which is what the live UI actually needs. Too small a sample (19-20 cases) to treat the accuracy gap as settled either way — don't claim either model is strictly more accurate.
 
 ## Reproduce any number above
 

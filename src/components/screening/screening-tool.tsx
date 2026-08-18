@@ -41,6 +41,18 @@ type Reviewed = {
   response: ScreenResponse;
 };
 
+/**
+ * Real /screen latency is 6-7s typical, up to 11-14s at p95 (see
+ * docs/JUDGE-ONEPAGER.md) — a static spinner that long reads as "broken."
+ * Staged messages tell the user the wait is expected and moving.
+ */
+const LOADING_STAGES = [
+  "Checking against conduct rules…",
+  "Cross-referencing Act 873 and BNM guidance…",
+  "Almost there…",
+] as const;
+const LOADING_STAGE_DELAYS_MS = [3500, 8000];
+
 function submissionFromSample(sample: SampleMessage): Submission {
   return {
     text: sample.text,
@@ -107,16 +119,33 @@ export function ScreeningTool() {
   const [apiError, setApiError] = useState<ApiError | null>(null);
   const [lastSubmission, setLastSubmission] = useState<Submission | null>(null);
   const [entries, setEntries] = useState<LogEntry[]>([]);
+  const [loadingStage, setLoadingStage] = useState(0);
 
   // Guards against a slow, superseded request clobbering the result of a
   // faster one that was started after it.
   const requestSeq = useRef(0);
+  const loadingTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  function clearLoadingTimers() {
+    loadingTimers.current.forEach(clearTimeout);
+    loadingTimers.current = [];
+  }
 
   async function runScreen(submission: Submission) {
     const seq = ++requestSeq.current;
+    clearLoadingTimers();
     setStatus("loading");
+    setLoadingStage(0);
     setApiError(null);
     setLastSubmission(submission);
+
+    LOADING_STAGE_DELAYS_MS.forEach((delay, i) => {
+      loadingTimers.current.push(
+        setTimeout(() => {
+          if (seq === requestSeq.current) setLoadingStage(i + 1);
+        }, delay),
+      );
+    });
 
     try {
       const response = await api.screen({
@@ -125,6 +154,7 @@ export function ScreeningTool() {
         account_id: submission.accountId,
       });
       if (seq !== requestSeq.current) return;
+      clearLoadingTimers();
 
       setReviewed({ submission, response });
       setStatus("done");
@@ -140,6 +170,7 @@ export function ScreeningTool() {
       ]);
     } catch (err) {
       if (seq !== requestSeq.current) return;
+      clearLoadingTimers();
       setApiError(
         err instanceof ApiError ? err : new ApiError("Something went wrong.", "unknown", true, 0),
       );
@@ -221,7 +252,17 @@ export function ScreeningTool() {
             {status === "loading" && (
               <span className="flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-navy-light">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Checking against conduct rules…
+                <AnimatePresence mode="wait">
+                  <motion.span
+                    key={loadingStage}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    {LOADING_STAGES[loadingStage]}
+                  </motion.span>
+                </AnimatePresence>
               </span>
             )}
           </div>

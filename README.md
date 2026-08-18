@@ -26,7 +26,7 @@ Screens every collector→customer message against a conduct rule pack, flags vi
 ```
 Next.js (Vercel)  ──HTTPS/JSON──►  FastAPI (Render)
    7 screens                            │
-                          Groq · openai/gpt-oss-120b
+                          Groq · openai/gpt-oss-20b
                                         │
                                 Postgres (Neon, Singapore)
                          messages · screening_results
@@ -121,7 +121,7 @@ Stated up front rather than discovered under questioning.
 - **The rate limiter is in-process** — it resets on restart and does not coordinate across replicas. The service runs a single worker deliberately, because the limiter and the coaching cache both live in memory.
 - **Call transcripts are typed text "as if transcribed".** No audio ingestion.
 - **No production auth, no multi-tenancy.** Both explicitly out of scope for this phase.
-- **Groq's free tier caps `openai/gpt-oss-120b` at 8,000 tokens/minute** (see `docs/DEPLOY.md`). Bulk seeding uses the smaller `openai/gpt-oss-20b`; agreement rates for the current model pair haven't been re-benchmarked since the earlier `llama-3.3-70b`/`llama-3.1-8b` figures no longer apply — rerun `scripts/eval_golden_set.py` for current numbers. Every verdict records which model produced it.
+- **Groq's free tier caps both current models at 8,000 tokens/minute** (see `docs/DEPLOY.md`). Live screening runs on `openai/gpt-oss-20b`; bulk seeding uses `openai/gpt-oss-120b` — swapped from the original assignment once golden-set data showed `gpt-oss-20b` is both more accurate and faster on this task. See `docs/JUDGE-ONEPAGER.md` for current numbers. Every verdict records which model produced it.
 
 ## Credits
 

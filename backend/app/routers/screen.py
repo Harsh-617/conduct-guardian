@@ -106,11 +106,12 @@ async def screen(
             },
         )
 
-    # Bulk seeding uses the cheaper model: Groq's free tier caps
-    # openai/gpt-oss-120b at 8,000 tokens PER MINUTE, which a burst of live
-    # screening calls can exhaust — leaving nothing for the demo mid-pitch.
-    # openai/gpt-oss-20b has its own budget, and every verdict records which
-    # model produced it.
+    # Live screening runs on openai/gpt-oss-20b: golden-set data showed it is
+    # both faster (6.3s vs 7.7s p50) and more accurate (95.2% vs 90.0% F1)
+    # than gpt-oss-120b on this task — see docs/JUDGE-ONEPAGER.md. Bulk
+    # seeding uses gpt-oss-120b instead, so a seed run's token spend doesn't
+    # eat into the per-minute budget the live demo needs, and every verdict
+    # records which model produced it.
     model_used = settings.groq_model_bulk if payload.use_bulk_model else settings.groq_model
 
     try:

@@ -88,7 +88,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   health: () => request<HealthResponse>("/health"),
 
-  /** Live Screening. Real Groq call — expect a few hundred ms. */
+  /** Live Screening. Real Groq call — expect 6-7s typical, up to 11-14s at p95. */
   screen: (body: ScreenRequest) =>
     request<ScreenResponse>("/screen", {
       method: "POST",

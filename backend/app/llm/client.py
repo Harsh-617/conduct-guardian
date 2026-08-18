@@ -62,7 +62,7 @@ class LLMClient(Protocol):
 _NO_JSON_SCHEMA: set[str] = set()
 
 # Compact, not pretty-printed. This string is prepended to every single
-# screening call, and Groq's free tier caps openai/gpt-oss-120b at 8,000
+# screening call, and Groq's free tier caps both current models at 8,000
 # tokens PER MINUTE — indenting the schema for human readability costs real
 # demo capacity.
 _SCHEMA_INSTRUCTION = (
