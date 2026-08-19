@@ -79,6 +79,8 @@ export function Timeline() {
 
       {loading ? (
         <LoadingRows rows={6} />
+      ) : error?.code === "account_not_found" ? (
+        <EmptyState message={`No account found with ID "${accountId}". Check the ID and try again.`} />
       ) : error ? (
         <ErrorState
           message={error.message}
