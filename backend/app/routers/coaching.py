@@ -12,6 +12,7 @@ forces regeneration. The counts underneath are always live SQL.
 
 from __future__ import annotations
 
+import asyncio
 import datetime as dt
 
 from fastapi import APIRouter, Depends, Query
@@ -66,7 +67,13 @@ async def coaching(
     rows = (await session.execute(totals)).all()
 
     any_cached = False
-    out: list[CoachingRow] = []
+    # First pass: everything that touches `session` runs sequentially here,
+    # since AsyncSession does not support concurrent use. Each entry ends up
+    # either with a cached summary already resolved, or with the flagged
+    # texts an LLM call still needs — that call happens in the second pass,
+    # off the session, so slow/rate-limited collectors don't serialize behind
+    # each other.
+    pending: list[dict] = []
 
     for row in rows:
         flagged = int(row.flagged or 0)
@@ -89,6 +96,7 @@ async def coaching(
             top_rule = first.rule if first else None
 
         summary: str | None = None
+        texts: list[str] = []
         if flagged:
             cached = None if refresh else _cache_get(
                 row.collector_id, settings.coaching_cache_minutes
@@ -97,43 +105,66 @@ async def coaching(
                 summary = cached
                 any_cached = True
             else:
-                texts = (
-                    await session.execute(
-                        select(Message.raw_text)
-                        .join(ScreeningResult, ScreeningResult.message_id == Message.id)
-                        .where(
-                            Message.collector_id == row.collector_id,
-                            ScreeningResult.violation.is_(True),
+                texts = list(
+                    (
+                        await session.execute(
+                            select(Message.raw_text)
+                            .join(ScreeningResult, ScreeningResult.message_id == Message.id)
+                            .where(
+                                Message.collector_id == row.collector_id,
+                                ScreeningResult.violation.is_(True),
+                            )
+                            .order_by(Message.occurred_at.desc())
+                            .limit(15)
                         )
-                        .order_by(Message.occurred_at.desc())
-                        .limit(15)
-                    )
-                ).scalars().all()
-                try:
-                    client = get_llm_client()
-                    summary = await summarise_collector_pattern(
-                        client,
-                        row.collector_name,
-                        list(texts),
-                        model=settings.groq_model,
-                    )
-                    _summary_cache[row.collector_id] = (dt.datetime.now(dt.UTC), summary)
-                except LLMUnavailable:
-                    # Counts are real and useful on their own; a missing summary
-                    # must not blank the whole leaderboard.
-                    summary = None
+                    ).scalars().all()
+                )
 
-        out.append(
-            CoachingRow(
-                collector_id=row.collector_id,
-                collector_name=row.collector_name,
-                total_messages=int(row.total_messages or 0),
-                flagged=flagged,
-                flag_rate=round(flagged / row.total_messages, 3) if row.total_messages else 0.0,
-                top_rule=top_rule,
-                pattern_summary=summary,
-            )
+        pending.append(
+            {
+                "collector_id": row.collector_id,
+                "collector_name": row.collector_name,
+                "total_messages": int(row.total_messages or 0),
+                "flagged": flagged,
+                "top_rule": top_rule,
+                "summary": summary,
+                "texts": texts,
+            }
         )
+
+    async def _generate(collector_id: int, collector_name: str, texts: list[str]) -> str | None:
+        try:
+            client = get_llm_client()
+            summary = await summarise_collector_pattern(
+                client, collector_name, texts, model=settings.groq_model
+            )
+            _summary_cache[collector_id] = (dt.datetime.now(dt.UTC), summary)
+            return summary
+        except LLMUnavailable:
+            # Counts are real and useful on their own; a missing summary must
+            # not blank the whole leaderboard.
+            return None
+
+    to_generate = [p for p in pending if p["summary"] is None and p["texts"]]
+    if to_generate:
+        generated = await asyncio.gather(
+            *(_generate(p["collector_id"], p["collector_name"], p["texts"]) for p in to_generate)
+        )
+        for p, summary in zip(to_generate, generated):
+            p["summary"] = summary
+
+    out = [
+        CoachingRow(
+            collector_id=p["collector_id"],
+            collector_name=p["collector_name"],
+            total_messages=p["total_messages"],
+            flagged=p["flagged"],
+            flag_rate=round(p["flagged"] / p["total_messages"], 3) if p["total_messages"] else 0.0,
+            top_rule=p["top_rule"],
+            pattern_summary=p["summary"],
+        )
+        for p in pending
+    ]
 
     out.sort(key=lambda r: (r.flagged, r.flag_rate), reverse=True)
     return CoachingResponse(

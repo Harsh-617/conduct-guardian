@@ -37,8 +37,16 @@ export class ApiError extends Error {
   }
 }
 
+// Cold starts on Render's free tier take 30-50s (see below); /coaching can
+// also fan out several sequential LLM calls on a cache miss. Without a
+// client-side ceiling, a hung backend leaves the UI stuck on the loading
+// skeleton forever with no path to the retry state.
+const REQUEST_TIMEOUT_MS = 60_000;
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
@@ -47,17 +55,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       // a cached dashboard showing yesterday's counts during a demo is worse
       // than a slightly slower one.
       cache: "no-store",
+      signal: controller.signal,
     });
   } catch {
-    // Network-level failure. On Render's free tier the backend sleeps after
-    // ~15 min idle and the next request takes 30-50s, so this is very often
-    // a cold start rather than a real outage. Always retryable.
+    // Network-level failure, or our own timeout abort. On Render's free tier
+    // the backend sleeps after ~15 min idle and the next request takes
+    // 30-50s, so this is very often a cold start rather than a real outage.
+    // Always retryable.
     throw new ApiError(
       "Could not reach the screening service. It may be waking up.",
       "network_error",
       true,
       0,
     );
+  } finally {
+    clearTimeout(timeout);
   }
 
   if (!response.ok) {
