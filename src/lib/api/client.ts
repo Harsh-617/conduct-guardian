@@ -8,6 +8,7 @@
  */
 
 import type {
+  AccountsResponse,
   AgencyResponse,
   CoachingResponse,
   DashboardStats,
@@ -111,6 +112,8 @@ export const api = {
 
   timeline: (accountExternalId: string) =>
     request<TimelineResponse>(`/timeline/${encodeURIComponent(accountExternalId)}`),
+
+  accounts: () => request<AccountsResponse>("/accounts"),
 
   /**
    * `violationsOnly` is what the dashboard's Recent Flags panel wants — a

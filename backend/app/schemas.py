@@ -102,6 +102,20 @@ class TimelineResponse(BaseModel):
     patterns: list[PatternFlag]
 
 
+# --- /accounts ---------------------------------------------------------------
+
+
+class AccountSummary(BaseModel):
+    model_config = ORM
+
+    id: int
+    external_id: str
+
+
+class AccountsResponse(BaseModel):
+    accounts: list[AccountSummary]
+
+
 # --- /ledger ---------------------------------------------------------------
 
 

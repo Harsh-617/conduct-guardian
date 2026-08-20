@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.db import engine
-from app.routers import agencies, coaching, dashboard, hardship, ledger, screen, timeline
+from app.routers import accounts, agencies, coaching, dashboard, hardship, ledger, screen, timeline
 
 logger = logging.getLogger("conduct_guardian")
 
@@ -79,5 +79,5 @@ async def health() -> dict[str, object]:
     }
 
 
-for module in (screen, dashboard, timeline, ledger, coaching, hardship, agencies):
+for module in (screen, dashboard, timeline, ledger, coaching, hardship, agencies, accounts):
     app.include_router(module.router, tags=[module.__name__.rsplit(".", 1)[-1]])

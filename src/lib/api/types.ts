@@ -195,6 +195,15 @@ export interface AgencyResponse {
   rows: AgencyRow[];
 }
 
+export interface AccountSummary {
+  id: number;
+  external_id: string;
+}
+
+export interface AccountsResponse {
+  accounts: AccountSummary[];
+}
+
 export interface HealthResponse {
   status: string;
   groq_configured: boolean;
