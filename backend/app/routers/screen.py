@@ -17,10 +17,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.db import get_session
 from app.ledger import append_entry
-from app.llm.client import LLMUnavailable, get_llm_client
+from app.llm.client import LLMClient, LLMUnavailable, get_llm_client
 from app.llm.hardship import detect_hardship
 from app.llm.screening import screen_message
-from app.models import Account, Agency, Collector, HardshipSignal, Message, ScreeningResult
+from app.models import (
+    Account,
+    Agency,
+    Channel,
+    Collector,
+    HardshipSignal,
+    Message,
+    ScreeningResult,
+)
 from app.ratelimit import rate_limit_screen
 from app.schemas import ScreenRequest, ScreenResponse, Verdict
 
@@ -44,7 +52,7 @@ async def _resolve_account(session: AsyncSession, external_id: str) -> Account:
     return account
 
 
-async def _first_or_create_collector(session: AsyncSession, collector_id: int | None) -> Collector:
+async def first_or_create_collector(session: AsyncSession, collector_id: int | None) -> Collector:
     if collector_id is not None:
         found = await session.get(Collector, collector_id)
         if found is None:
@@ -63,7 +71,7 @@ async def _first_or_create_collector(session: AsyncSession, collector_id: int | 
     return collector
 
 
-async def _first_or_create_agency(session: AsyncSession, agency_id: int | None) -> Agency:
+async def first_or_create_agency(session: AsyncSession, agency_id: int | None) -> Agency:
     if agency_id is not None:
         found = await session.get(Agency, agency_id)
         if found is None:
@@ -80,6 +88,96 @@ async def _first_or_create_agency(session: AsyncSession, agency_id: int | None) 
         session.add(agency)
         await session.flush()
     return agency
+
+
+async def run_screening_pipeline(
+    session: AsyncSession,
+    client: LLMClient,
+    *,
+    account: Account,
+    collector: Collector,
+    agency: Agency,
+    channel: Channel,
+    text: str,
+    is_customer: bool,
+    occurred_at: dt.datetime,
+    model: str,
+) -> ScreenResponse:
+    """The one real pipeline: message in -> Message + ScreeningResult + chained
+    ledger entry -> verdict out.
+
+    Every channel goes through this exact function — the HTTP `/screen` route
+    below and the email poller (`app.channels.email_poller`) alike — so there
+    is exactly one place that calls the LLM and exactly one place that writes
+    the evidence ledger, whichever channel a message arrived on.
+
+    Raises `LLMUnavailable` on an LLM failure for a collector-side (non
+    customer) message; callers decide how to surface that (HTTP 503 for the
+    route, a logged-and-retried skip for the poller). Commits on success.
+    """
+    message = Message(
+        account_id=account.id,
+        collector_id=collector.id,
+        agency_id=agency.id,
+        channel=channel,
+        raw_text=text,
+        is_customer=is_customer,
+        occurred_at=occurred_at,
+    )
+    session.add(message)
+    await session.flush()
+
+    # Customer-side text is never screened for collector conduct — it's the
+    # borrower speaking. It goes down the hardship path instead.
+    if is_customer:
+        verdict = Verdict(
+            violation=False,
+            rule=None,
+            quoted_phrase=None,
+            explanation="Customer-side message; not screened for collector conduct.",
+            suggested_rewrite=None,
+        )
+        latency_ms = 0
+        try:
+            signals = await detect_hardship(client, text, model=model)
+            for signal_type, quoted in signals:
+                session.add(
+                    HardshipSignal(
+                        message_id=message.id, signal_type=signal_type, quoted_text=quoted
+                    )
+                )
+        except LLMUnavailable:
+            # A hardship-detection failure must not lose the message itself.
+            pass
+    else:
+        verdict, latency_ms = await screen_message(client, text, model=model)
+
+    result = ScreeningResult(
+        message_id=message.id,
+        violation=verdict.violation,
+        rule=verdict.rule,
+        quoted_phrase=verdict.quoted_phrase,
+        explanation=verdict.explanation,
+        suggested_rewrite=verdict.suggested_rewrite,
+        model=model,
+        latency_ms=latency_ms,
+    )
+    session.add(result)
+    # created_at is a server default, so it must exist before it can be hashed.
+    await session.flush()
+    await session.refresh(result, ["created_at"])
+
+    entry = await append_entry(session, result)
+    await session.commit()
+
+    return ScreenResponse(
+        message_id=message.id,
+        screening_result_id=result.id,
+        verdict=verdict,
+        model=model,
+        latency_ms=latency_ms,
+        ledger_entry_hash=entry.entry_hash,
+    )
 
 
 @router.post("/screen", response_model=ScreenResponse)
@@ -123,77 +221,24 @@ async def screen(
         ) from exc
 
     account = await _resolve_account(session, payload.account_id)
-    collector = await _first_or_create_collector(session, payload.collector_id)
-    agency = await _first_or_create_agency(session, payload.agency_id)
+    collector = await first_or_create_collector(session, payload.collector_id)
+    agency = await first_or_create_agency(session, payload.agency_id)
 
-    message = Message(
-        account_id=account.id,
-        collector_id=collector.id,
-        agency_id=agency.id,
-        channel=payload.channel,
-        raw_text=text,
-        is_customer=payload.is_customer,
-        occurred_at=payload.occurred_at or dt.datetime.now(dt.UTC),
-    )
-    session.add(message)
-    await session.flush()
-
-    # Customer-side text is never screened for collector conduct — it's the
-    # borrower speaking. It goes down the hardship path instead.
-    if payload.is_customer:
-        verdict = Verdict(
-            violation=False,
-            rule=None,
-            quoted_phrase=None,
-            explanation="Customer-side message; not screened for collector conduct.",
-            suggested_rewrite=None,
+    try:
+        return await run_screening_pipeline(
+            session,
+            client,
+            account=account,
+            collector=collector,
+            agency=agency,
+            channel=payload.channel,
+            text=text,
+            is_customer=payload.is_customer,
+            occurred_at=payload.occurred_at or dt.datetime.now(dt.UTC),
+            model=model_used,
         )
-        latency_ms = 0
-        try:
-            signals = await detect_hardship(client, text, model=model_used)
-            for signal_type, quoted in signals:
-                session.add(
-                    HardshipSignal(
-                        message_id=message.id, signal_type=signal_type, quoted_text=quoted
-                    )
-                )
-        except LLMUnavailable:
-            # A hardship-detection failure must not lose the message itself.
-            pass
-    else:
-        try:
-            verdict, latency_ms = await screen_message(
-                client, text, model=model_used
-            )
-        except LLMUnavailable as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail={"code": exc.code, "message": str(exc), "retryable": exc.retryable},
-            ) from exc
-
-    result = ScreeningResult(
-        message_id=message.id,
-        violation=verdict.violation,
-        rule=verdict.rule,
-        quoted_phrase=verdict.quoted_phrase,
-        explanation=verdict.explanation,
-        suggested_rewrite=verdict.suggested_rewrite,
-        model=model_used,
-        latency_ms=latency_ms,
-    )
-    session.add(result)
-    # created_at is a server default, so it must exist before it can be hashed.
-    await session.flush()
-    await session.refresh(result, ["created_at"])
-
-    entry = await append_entry(session, result)
-    await session.commit()
-
-    return ScreenResponse(
-        message_id=message.id,
-        screening_result_id=result.id,
-        verdict=verdict,
-        model=model_used,
-        latency_ms=latency_ms,
-        ledger_entry_hash=entry.entry_hash,
-    )
+    except LLMUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": exc.code, "message": str(exc), "retryable": exc.retryable},
+        ) from exc

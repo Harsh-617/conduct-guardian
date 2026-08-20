@@ -23,6 +23,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import TypeDecorator
 
 from app.db import Base
 
@@ -50,7 +51,39 @@ HardshipEnumType = Enum(
     HardshipType, native_enum=False, length=24, validate_strings=True
 )
 
-TimestampTZ = DateTime(timezone=True)
+
+class UTCDateTime(TypeDecorator):
+    """`DateTime(timezone=True)` that guarantees a tz-aware UTC value on read.
+
+    Postgres (production) round-trips `timestamptz` correctly on its own —
+    this is a no-op there. SQLite (local dev) has no real timezone-aware
+    column type: SQLAlchemy's sqlite dialect silently drops tzinfo on write
+    and hands back a naive `datetime` on read, even though the column is
+    declared `timezone=True`. A naive `datetime` serializes to JSON with no
+    UTC offset (`"...T16:54:30"` instead of `"...T16:54:30+00:00"`), and the
+    frontend's `new Date(iso)` then parses that as *local* time per the
+    ECMAScript date-string spec — silently misreading a UTC instant as
+    already being in the viewer's timezone. For Malaysia (UTC+8) that's
+    exactly an 8-hour, sometimes date-shifting, display error. Every value
+    written here is already UTC (see `run_screening_pipeline`), so fixing the
+    read side alone is sufficient — no data migration needed.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value: dt.datetime | None, dialect) -> dt.datetime | None:
+        if value is not None and value.tzinfo is not None:
+            value = value.astimezone(dt.UTC)
+        return value
+
+    def process_result_value(self, value: dt.datetime | None, dialect) -> dt.datetime | None:
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=dt.UTC)
+        return value
+
+
+TimestampTZ = UTCDateTime()
 
 
 class Agency(Base):
@@ -84,6 +117,16 @@ class Account(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     # The customer-facing reference, e.g. "4471" — matches the UI mockup.
     external_id: Mapped[str] = mapped_column(String(60), unique=True, index=True)
+    # Real channel identity, used to resolve an inbound email/SMS to its
+    # account by who actually sent it — never by a manually-typed tag. Null
+    # until the sender's first message; unique so one contact never splits
+    # across two accounts.
+    contact_email: Mapped[str | None] = mapped_column(
+        String(255), unique=True, index=True, nullable=True
+    )
+    contact_phone: Mapped[str | None] = mapped_column(
+        String(32), unique=True, index=True, nullable=True
+    )
     created_at: Mapped[dt.datetime] = mapped_column(
         TimestampTZ, server_default=func.now()
     )

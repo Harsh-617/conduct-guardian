@@ -6,18 +6,38 @@ Nothing else — no queue, no workers, no container orchestration.
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.channels.email_poller import poll_forever
 from app.config import get_settings
 from app.db import engine
 from app.routers import accounts, agencies, coaching, dashboard, hardship, ledger, screen, timeline
 
 logger = logging.getLogger("conduct_guardian")
+
+# uvicorn's default logging config (see uvicorn.config.LOGGING_CONFIG) only
+# configures its own "uvicorn"/"uvicorn.access" loggers and leaves the root
+# logger untouched, which defaults to WARNING with no handlers. Without a
+# handler of our own, every logger.info() call on this logger (and its
+# children, e.g. "conduct_guardian.email") falls through to Python's
+# logging.lastResort — a hidden fallback handler that has its OWN hardcoded
+# WARNING threshold, so INFO logs vanish silently even if this logger's level
+# is set to INFO. A live demo debugged over warnings-and-errors-only is not
+# debuggable, so this app owns its own logger explicitly instead of trusting
+# uvicorn's or Python's defaults.
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(
+        logging.Formatter("%(asctime)s %(levelname)-8s %(name)s: %(message)s")
+    )
+    logger.addHandler(_handler)
+logger.setLevel(logging.INFO)
 
 settings = get_settings()
 
@@ -31,7 +51,35 @@ async def lifespan(app: FastAPI):
         logger.warning("GROQ_API_KEY is not set — /screen will return 503.")
     if not settings.database_url:
         logger.warning("DATABASE_URL is not set — falling back to local SQLite.")
+
+    # Confirm what was actually read from the environment — never the secret
+    # value itself, just whether it's present — so a misconfigured .env (or a
+    # server started from the wrong working directory, which silently yields
+    # empty settings rather than an error) is visible at a glance in the logs
+    # instead of manifesting as "the poller just doesn't seem to do anything."
+    logger.info(
+        "email config: EMAIL_ADDRESS=%s EMAIL_APP_PASSWORD=%s "
+        "DEMO_COLLECTOR_EMAIL=%s DEMO_CUSTOMER_EMAIL=%s",
+        "set" if settings.email_address else "MISSING",
+        "set" if settings.email_app_password else "MISSING",
+        settings.demo_collector_email or "(unset)",
+        settings.demo_customer_email or "(unset)",
+    )
+
+    email_task: asyncio.Task | None = None
+    if settings.email_address and settings.email_app_password:
+        email_task = asyncio.create_task(poll_forever())
+    else:
+        logger.warning(
+            "EMAIL_ADDRESS/EMAIL_APP_PASSWORD not set — email channel disabled."
+        )
+
     yield
+
+    if email_task is not None:
+        email_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await email_task
     await engine.dispose()
 
 

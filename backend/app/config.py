@@ -23,6 +23,22 @@ class Settings(BaseSettings):
     groq_model: str = "openai/gpt-oss-20b"
     groq_model_bulk: str = "openai/gpt-oss-120b"
 
+    # Email channel — secrets have no defaults (see above); host/port default
+    # to Gmail since an app password is a Gmail-specific concept. Missing
+    # EMAIL_ADDRESS/EMAIL_APP_PASSWORD just disables the poller at startup.
+    email_address: str = ""
+    email_app_password: str = ""
+    email_imap_host: str = "imap.gmail.com"
+    email_imap_port: int = 993
+    email_poll_interval_seconds: int = 15
+
+    # Live-demo sender routing: mail from one address is screened as the
+    # collector (conduct check), from the other as the customer (hardship
+    # check). Any other sender still resolves to its own account via contact
+    # matching and defaults to is_customer=False.
+    demo_collector_email: str = ""
+    demo_customer_email: str = ""
+
     # 30/min, not 10: on stage you may screen half a dozen examples and a judge
     # may then try several of their own. A 429 mid-pitch reads as "it's broken"
     # regardless of the cause, and 30/min still stops casual hammering.
