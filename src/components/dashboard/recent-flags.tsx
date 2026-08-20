@@ -85,7 +85,7 @@ export function RecentFlags({ delay = 0 }: { delay?: number }) {
                 key={row.id}
                 className="flex flex-col gap-3 py-4 first:pt-2 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="flex flex-1 items-start gap-3 sm:items-center">
+                <div className="flex flex-1 flex-wrap items-start gap-3 sm:flex-nowrap sm:items-center">
                   <span className="w-32 shrink-0 font-mono text-xs text-navy-light">
                     {row.timestamp}
                   </span>
