@@ -2,12 +2,14 @@
 
 import { useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { Loader2, Mail, MessageCircle, MessageSquare, Phone, ShieldCheck } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/data-state";
 import { api, ApiError } from "@/lib/api/client";
 import { formatTimestamp, ruleLabel } from "@/lib/api/adapters";
-import type { ApiChannel, ScreenResponse } from "@/lib/api/types";
+import { useApi } from "@/lib/api/use-api";
+import type { AccountSummary, ApiChannel, ScreenResponse } from "@/lib/api/types";
 import { SamplePanel } from "./sample-panel";
 import { VerdictStamp } from "./verdict-stamp";
 import { EvidenceLog } from "./evidence-log";
@@ -22,6 +24,26 @@ const API_CHANNEL: Record<Channel, ApiChannel> = {
   WhatsApp: "whatsapp",
   SMS: "sms",
 };
+
+/** Channel choices offered for custom/free-text submissions. */
+const CHANNEL_OPTIONS: { value: ApiChannel; label: string; icon: LucideIcon }[] = [
+  { value: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+  { value: "sms", label: "SMS", icon: MessageSquare },
+  { value: "call", label: "Call", icon: Phone },
+  { value: "email", label: "Email", icon: Mail },
+];
+
+const CHANNEL_LABEL: Record<ApiChannel, string> = {
+  whatsapp: "WhatsApp",
+  sms: "SMS",
+  call: "Call",
+  email: "Email",
+};
+
+// Chips are a convenience picker, not a directory — cap the row so it can't
+// grow into a wall of buttons as the account list grows. Matches the cap
+// used by the Case Timeline's account switcher.
+const MAX_ACCOUNT_CHIPS = 12;
 
 /**
  * What gets sent to /screen plus what the results panel needs to render
@@ -65,16 +87,13 @@ function submissionFromSample(sample: SampleMessage): Submission {
   };
 }
 
-function submissionFromText(text: string): Submission {
+function submissionFromText(text: string, accountId: string, apiChannel: ApiChannel): Submission {
   return {
     text,
-    channelLabel: "Custom Input",
-    accountLabel: null,
-    // Left undefined rather than guessed: JSON.stringify drops undefined
-    // keys, so the backend applies its own default (whatsapp / "4471")
-    // instead of us fabricating a channel/account nobody chose.
-    apiChannel: undefined,
-    accountId: undefined,
+    channelLabel: CHANNEL_LABEL[apiChannel],
+    accountLabel: `Account #${accountId}`,
+    apiChannel,
+    accountId,
   };
 }
 
@@ -111,6 +130,104 @@ function TranscriptText({ text, highlight }: { text: string; highlight: Highligh
   );
 }
 
+/** Account chip + free-text picker for custom submissions. Same visual pattern as the Case Timeline's account switcher. */
+function AccountPicker({
+  accounts,
+  value,
+  onChange,
+  disabled,
+}: {
+  accounts: AccountSummary[];
+  value: string;
+  onChange: (id: string) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className={disabled ? "pointer-events-none opacity-50" : ""}>
+      <label
+        htmlFor="screen-account-id"
+        className="font-mono text-[11px] uppercase tracking-[0.2em] text-navy-light"
+      >
+        Account
+      </label>
+      <input
+        id="screen-account-id"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        placeholder="Select an account or type a new ID"
+        className="mt-2 w-full max-w-xs rounded border border-hairline bg-paper px-4 py-2 font-mono text-sm text-ink-navy placeholder:text-navy-light/70 focus:border-brass-accent focus:outline-none"
+      />
+      {accounts.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {accounts.slice(0, MAX_ACCOUNT_CHIPS).map((account) => {
+            const active = account.external_id === value;
+            return (
+              <button
+                key={account.id}
+                type="button"
+                onClick={() => onChange(account.external_id)}
+                className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${
+                  active
+                    ? "border-brass-accent bg-soft-brass text-brass-accent"
+                    : "border-hairline bg-paper text-navy-light hover:border-brass-accent/50 hover:bg-soft-brass/40"
+                }`}
+              >
+                #{account.external_id}
+              </button>
+            );
+          })}
+          {accounts.length > MAX_ACCOUNT_CHIPS && (
+            <span className="font-mono text-xs text-navy-light">
+              +{accounts.length - MAX_ACCOUNT_CHIPS} more — type the ID above
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Channel button group for custom submissions. Same rounded-pill styling as ChannelBadge. */
+function ChannelPicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: ApiChannel;
+  onChange: (channel: ApiChannel) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className={disabled ? "pointer-events-none opacity-50" : ""}>
+      <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-navy-light">
+        Channel
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {CHANNEL_OPTIONS.map(({ value: optionValue, label, icon: Icon }) => {
+          const active = optionValue === value;
+          return (
+            <button
+              key={optionValue}
+              type="button"
+              onClick={() => onChange(optionValue)}
+              disabled={disabled}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[11px] uppercase tracking-wide transition-colors ${
+                active
+                  ? "border-brass-accent bg-soft-brass text-brass-accent"
+                  : "border-hairline bg-paper text-navy-light hover:border-brass-accent/50 hover:bg-soft-brass/40"
+              }`}
+            >
+              <Icon className="h-3 w-3" />
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function ScreeningTool() {
   const [text, setText] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -120,6 +237,10 @@ export function ScreeningTool() {
   const [lastSubmission, setLastSubmission] = useState<Submission | null>(null);
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [loadingStage, setLoadingStage] = useState(0);
+  const [customAccountId, setCustomAccountId] = useState("");
+  const [customChannel, setCustomChannel] = useState<ApiChannel>("whatsapp");
+
+  const { data: accountsData } = useApi(() => api.accounts(), []);
 
   // Guards against a slow, superseded request clobbering the result of a
   // faster one that was started after it.
@@ -200,7 +321,13 @@ export function ScreeningTool() {
   function handleRun() {
     if (!text.trim() || status === "loading") return;
     const selectedSample = selectedId ? samples.find((s) => s.id === selectedId) : null;
-    void runScreen(selectedSample ? submissionFromSample(selectedSample) : submissionFromText(text.trim()));
+    if (selectedSample) {
+      void runScreen(submissionFromSample(selectedSample));
+      return;
+    }
+    const accountId = customAccountId.trim();
+    if (!accountId) return;
+    void runScreen(submissionFromText(text.trim(), accountId, customChannel));
   }
 
   function handleRetry() {
@@ -238,11 +365,32 @@ export function ScreeningTool() {
             className="mt-4 w-full resize-none rounded border border-hairline bg-paper px-4 py-3 font-mono text-sm leading-relaxed text-ink-navy placeholder:text-navy-light/70 focus:border-brass-accent focus:outline-none"
           />
 
+          <div className="mt-4 flex flex-wrap gap-6">
+            <AccountPicker
+              accounts={accountsData?.accounts ?? []}
+              value={customAccountId}
+              onChange={setCustomAccountId}
+              disabled={selectedId !== null}
+            />
+            <ChannelPicker
+              value={customChannel}
+              onChange={setCustomChannel}
+              disabled={selectedId !== null}
+            />
+          </div>
+          {selectedId && (
+            <p className="mt-2 font-mono text-xs text-navy-light">
+              Using the sample&apos;s own account and channel — clear the text to pick your own.
+            </p>
+          )}
+
           <div className="mt-4 flex flex-wrap items-center gap-4">
             <Button
               type="button"
               onClick={handleRun}
-              disabled={!text.trim() || status === "loading"}
+              disabled={
+                !text.trim() || status === "loading" || (!selectedId && !customAccountId.trim())
+              }
               className="gap-2"
             >
               <ShieldCheck className="h-4 w-4" />
@@ -266,6 +414,12 @@ export function ScreeningTool() {
               </span>
             )}
           </div>
+
+          {!selectedId && text.trim() && !customAccountId.trim() && (
+            <p className="mt-2 font-mono text-xs text-stamp-red">
+              Select or enter an account before running a custom message.
+            </p>
+          )}
 
           <AnimatePresence mode="wait">
             {status === "error" && apiError && (
