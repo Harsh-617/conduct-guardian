@@ -29,13 +29,14 @@ import imaplib
 import logging
 from email.message import Message as EmailMessage
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.accounts import resolve_account_by_contact
 from app.config import Settings, get_settings
 from app.db import SessionLocal
 from app.llm.client import LLMClient, LLMUnavailable, get_llm_client
-from app.models import Channel
+from app.models import Channel, Collector
 from app.routers.screen import (
     first_or_create_agency,
     first_or_create_collector,
@@ -131,6 +132,28 @@ def _classify_sender(settings: Settings, sender_email: str) -> bool:
     return False
 
 
+async def _first_or_create_collector_by_name(session: AsyncSession, name: str) -> Collector:
+    """Find the named collector, creating one only if seeding was skipped.
+
+    `first_or_create_collector(session, None)` (used by `/screen` and by this
+    poller's hardship pathway) picks whichever `Collector` row has the lowest
+    id — an arbitrary placeholder that happens to work for a demo but attaches
+    no real identity to the conduct being screened. The email channel's
+    collector-side pathway needs a specific, named officer instead, so
+    `/coaching`'s leaderboard attributes flags to someone real rather than an
+    accident of insertion order.
+    """
+    found = await session.execute(
+        select(Collector).where(Collector.name == name).order_by(Collector.id).limit(1)
+    )
+    collector = found.scalars().first()
+    if collector is None:
+        collector = Collector(name=name, role="collector")
+        session.add(collector)
+        await session.flush()
+    return collector
+
+
 #: The inbox being polled also receives Google's own automated
 #: account-security mail ("App password created", "2-Step Verification
 #: turned on", "New passkey added", "Recovery email changed", ...) — these
@@ -209,7 +232,15 @@ async def _process_email(
         is_customer,
     )
 
-    collector = await first_or_create_collector(session, None)
+    # Collector-side messages get attributed to a specific named officer, so
+    # /coaching's per-collector counts mean something; the hardship pathway is
+    # about the customer's own words, not any officer's conduct, so it keeps
+    # the arbitrary-but-valid placeholder — a real collector_id is required by
+    # the NOT NULL FK either way, it just isn't meaningful here.
+    if is_customer:
+        collector = await first_or_create_collector(session, None)
+    else:
+        collector = await _first_or_create_collector_by_name(session, settings.demo_collector_name)
     agency = await first_or_create_agency(session, None)
 
     result = await run_screening_pipeline(

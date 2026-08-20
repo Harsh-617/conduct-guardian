@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     demo_collector_email: str = ""
     demo_customer_email: str = ""
 
+    # The named officer the email channel's collector-side pathway attributes
+    # conduct to, so /coaching's per-collector leaderboard has a real name
+    # behind every email-sourced flag instead of whichever Collector row
+    # happens to have the lowest id. Already seeded (seed/sample_data.py) as
+    # the top-ranked collector in the demo data.
+    demo_collector_name: str = "Ravi Krishnan"
+
     # 30/min, not 10: on stage you may screen half a dozen examples and a judge
     # may then try several of their own. A 429 mid-pitch reads as "it's broken"
     # regardless of the cause, and 30/min still stops casual hammering.
