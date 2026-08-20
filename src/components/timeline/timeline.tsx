@@ -17,6 +17,10 @@ const DEFAULT_ACCOUNT_ID = "4471";
 // A few other seeded accounts, offered as quick picks alongside free text entry.
 const KNOWN_ACCOUNT_IDS = ["4471", "5820", "3392", "6104", "2277"];
 
+// Chips are a convenience picker, not a directory — cap the row so it can't
+// grow into a wall of buttons as the account list grows.
+const MAX_ACCOUNT_CHIPS = 12;
+
 function AccountSwitcher({
   accountId,
   accounts,
@@ -72,8 +76,8 @@ function AccountSwitcher({
       </div>
 
       {accounts.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {accounts.map((account) => {
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {accounts.slice(0, MAX_ACCOUNT_CHIPS).map((account) => {
             const active = account.external_id === accountId;
             return (
               <button
@@ -93,6 +97,11 @@ function AccountSwitcher({
               </button>
             );
           })}
+          {accounts.length > MAX_ACCOUNT_CHIPS && (
+            <span className="font-mono text-xs text-navy-light">
+              +{accounts.length - MAX_ACCOUNT_CHIPS} more — search by ID above
+            </span>
+          )}
         </div>
       )}
     </div>
