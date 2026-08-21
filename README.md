@@ -2,7 +2,7 @@
 
 **Conduct-compliance screening for Malaysian debt collection, built against the Consumer Credit Act 2025 (Act 873).**
 
-🔗 **Live app:** https://conduct-guardian-mu.vercel.app
+🔗 **Live app:** https://conduct-guardian.vercel.app
 🔧 **API:** https://conduct-guardian-api-ue84.onrender.com ([docs](https://conduct-guardian-api-ue84.onrender.com/docs) · [health](https://conduct-guardian-api-ue84.onrender.com/health))
 
 > **All data is synthetic.** No real borrower, collector, or agency data is used anywhere, ever.
