@@ -32,13 +32,6 @@ class Settings(BaseSettings):
     email_imap_port: int = 993
     email_poll_interval_seconds: int = 15
 
-    # Live-demo sender routing: mail from one address is screened as the
-    # collector (conduct check), from the other as the customer (hardship
-    # check). Any other sender still resolves to its own account via contact
-    # matching and defaults to is_customer=False.
-    demo_collector_email: str = ""
-    demo_customer_email: str = ""
-
     # The named officer the email channel's collector-side pathway attributes
     # conduct to, so /coaching's per-collector leaderboard has a real name
     # behind every email-sourced flag instead of whichever Collector row

@@ -58,12 +58,10 @@ async def lifespan(app: FastAPI):
     # empty settings rather than an error) is visible at a glance in the logs
     # instead of manifesting as "the poller just doesn't seem to do anything."
     logger.info(
-        "email config: EMAIL_ADDRESS=%s EMAIL_APP_PASSWORD=%s "
-        "DEMO_COLLECTOR_EMAIL=%s DEMO_CUSTOMER_EMAIL=%s",
+        "email config: EMAIL_ADDRESS=%s EMAIL_APP_PASSWORD=%s DEMO_COLLECTOR_NAME=%s",
         "set" if settings.email_address else "MISSING",
         "set" if settings.email_app_password else "MISSING",
-        settings.demo_collector_email or "(unset)",
-        settings.demo_customer_email or "(unset)",
+        settings.demo_collector_name,
     )
 
     email_task: asyncio.Task | None = None
