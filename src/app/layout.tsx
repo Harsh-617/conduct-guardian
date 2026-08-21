@@ -22,7 +22,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "Conduct Guardian",
-  description: "Conduct Guardian — Track 2 UI prototype.",
+  description: "Conduct Guardian — real-time compliance screening for Malaysian debt collection.",
 };
 
 export default function RootLayout({

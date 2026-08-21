@@ -56,7 +56,7 @@ export function Sidebar() {
         <div className="flex items-start justify-between px-5 pb-5 pt-6">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-navy-light">
-              Track 2 · UI Prototype
+              Track 2 · Conduct Compliance
             </p>
             <p className="mt-1 font-serif text-xl font-bold text-ink-navy">
               Conduct Guardian
