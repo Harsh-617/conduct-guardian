@@ -3,7 +3,7 @@
 **Conduct-compliance screening for Malaysian debt collection, built against the Consumer Credit Act 2025 (Act 873).**
 
 🔗 **Live app:** https://conduct-guardian-mu.vercel.app
-🔧 **API:** https://conduct-guardian-api.onrender.com ([docs](https://conduct-guardian-api.onrender.com/docs) · [health](https://conduct-guardian-api.onrender.com/health))
+🔧 **API:** https://conduct-guardian-api-ue84.onrender.com ([docs](https://conduct-guardian-api-ue84.onrender.com/docs) · [health](https://conduct-guardian-api-ue84.onrender.com/health))
 
 > **All data is synthetic.** No real borrower, collector, or agency data is used anywhere, ever.
 >
@@ -35,6 +35,10 @@ Next.js (Vercel)  ──HTTPS/JSON──►  FastAPI (Render)
 
 **One real pipeline.** `POST /screen` is the only write path: message → LLM screening → stored with a chained ledger entry. The seed script drives that *same public endpoint over HTTP* rather than calling the code directly, so every verdict in the database is a genuine model output. Every dashboard number is a SQL aggregate over that one dataset.
 
+**Evidence ledger.** Every screening verdict gets a chained hash entry (`evidence_ledger`) — each row's hash covers its own payload plus the previous row's hash, so any edit to historical data breaks every hash after it. `POST /ledger/verify` rehashes every stored row from its payload and reports the first row where the recomputed hash diverges from what's stored.
+
+**Real email channel.** Alongside synthetic seed data, `app/channels/email_poller.py` runs an IMAP poller as a background task inside the FastAPI process, polling a real mailbox on an interval. It tells collector from customer by *which folder* a message came from (`INBOX` = customer-side, `[Gmail]/Sent Mail` = collector-side) rather than matching a hardcoded sender address, then screens each new message through the exact same `/screen` pipeline — no second LLM-calling code path.
+
 ## Measured results
 
 Reproducible from scripts in this repo.
@@ -64,6 +68,15 @@ The 8-rule pack derives from **Act 873 s.85(1)(g)** and **Bank Negara Malaysia's
 The pack is data, not prompt text. A registered agency swaps it for the Restricted standards; the engine is unchanged.
 
 **The contact-frequency rule uses BNM's published maximum of 3 contacts per week**, computed deterministically in SQL rather than judged by the model. A separate same-hour burst check exists but is labelled everywhere as an internal heuristic, never as a regulatory limit.
+
+## Tech stack
+
+- **Frontend:** Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS 4, Recharts — deployed on Vercel.
+- **Backend:** FastAPI, SQLAlchemy 2 (async) + Alembic migrations, Pydantic v2 — deployed on Render (single worker).
+- **Database:** Postgres (Neon, Singapore region); SQLite is used as the local/test fallback with no `DATABASE_URL` set.
+- **LLM:** Groq — `openai/gpt-oss-20b` for live screening, `openai/gpt-oss-120b` for bulk seeding.
+- **Email channel:** IMAP polling (`imaplib`, stdlib) against a real mailbox.
+- **Tests:** pytest + pytest-asyncio, in-memory SQLite, fake LLM client — no network or real API key required.
 
 ## API
 
@@ -121,6 +134,8 @@ Stated up front rather than discovered under questioning.
 - **The rate limiter is in-process** — it resets on restart and does not coordinate across replicas. The service runs a single worker deliberately, because the limiter and the coaching cache both live in memory.
 - **Call transcripts are typed text "as if transcribed".** No audio ingestion.
 - **No production auth, no multi-tenancy.** Both explicitly out of scope for this phase.
+- **The real email channel has one hardcoded collector identity.** Folder-based detection (`INBOX` vs `Sent Mail`) tells collector from customer correctly, but every collector-side message is attributed to a single named collector rather than resolved per-sender — fine for a one-collector demo mailbox, not for a multi-collector agency.
+- **The conduct rule pack is built from Act 873 and BNM's published guidance, not the Commission's actual Restricted (Terhad) Conduct Standards** — those aren't publicly retrievable, so the rules are a good-faith derivation pending real regulator text, not a certified implementation of it.
 - **Groq's free tier caps both current models at 8,000 tokens/minute** (see `docs/DEPLOY.md`). Live screening runs on `openai/gpt-oss-20b`; bulk seeding uses `openai/gpt-oss-120b` — swapped from the original assignment once golden-set data showed `gpt-oss-20b` is both more accurate and faster on this task. See `docs/JUDGE-ONEPAGER.md` for current numbers. Every verdict records which model produced it.
 
 ## Credits

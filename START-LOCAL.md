@@ -6,8 +6,8 @@ Two things have to be running at once: the **backend** (the brain) and the
 ## Terminal 1 — backend
 
 ```bash
-cd ~/conduct-guardian-ui/backend
-~/conduct-guardian/backend/.venv/Scripts/python.exe run_local.py
+cd ~/conduct-guardian/backend
+./.venv/Scripts/python.exe run_local.py
 ```
 
 Wait until it says `Application startup complete`. Leave this window open.
@@ -19,9 +19,14 @@ Check it: open http://127.0.0.1:8000/health — you want
 ## Terminal 2 — frontend
 
 ```bash
-cd ~/conduct-guardian-ui
+cd ~/conduct-guardian
+npm run build
 npx next start -p 3000
 ```
+
+(`next start` serves a pre-built copy — it needs that build to exist first. If
+you're actively editing frontend code, use `npx next dev` instead, which
+skips the build step and reloads automatically.)
 
 Then open **http://127.0.0.1:3000/dashboard**.
 
@@ -61,8 +66,8 @@ The frontend cannot reach the backend. Terminal 1 is not running, or it crashed
 The database is empty. Re-seed:
 
 ```bash
-cd ~/conduct-guardian-ui/backend
-~/conduct-guardian/backend/.venv/Scripts/python.exe -m seed.seed --days 14 --reset
+cd ~/conduct-guardian/backend
+./.venv/Scripts/python.exe -m seed.seed --days 14 --reset
 ```
 
 Takes a few minutes; it sends every message through the real screening endpoint.

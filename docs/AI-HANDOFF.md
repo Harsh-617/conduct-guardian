@@ -8,7 +8,7 @@ building, which skill/agent handles which part, what's decided, and what's left.
 ## 0. DEPLOYED — live URLs
 
 - **App (Vercel, never sleeps):** https://conduct-guardian-mu.vercel.app
-- **API (Render free tier, sleeps after ~15 min idle):** https://conduct-guardian-api.onrender.com
+- **API (Render free tier, sleeps after ~15 min idle):** https://conduct-guardian-api-ue84.onrender.com
 - **Repo:** https://github.com/suryakumarisalive-art/conduct-guardian — `main` and
   `real-backend` are the same commit. Vercel builds `main`.
 - Upstream (teammate's UI prototype): https://github.com/Harsh-617/conduct-guardian —

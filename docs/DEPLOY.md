@@ -83,7 +83,7 @@ The build runs `alembic upgrade head`, so the schema is created on first deploy.
 **Check it:**
 
 ```bash
-curl https://conduct-guardian-api.onrender.com/health
+curl https://conduct-guardian-api-ue84.onrender.com/health
 ```
 
 Expect `{"status":"ok","groq_configured":true,"database_configured":true,...}`.
@@ -99,7 +99,7 @@ From your laptop, against the deployed backend:
 
 ```bash
 cd backend
-API_BASE_URL=https://conduct-guardian-api.onrender.com \
+API_BASE_URL=https://conduct-guardian-api-ue84.onrender.com \
 SEED_TOKEN=<the generated value from Render> \
 ./.venv/Scripts/python.exe -m seed.seed --days 14
 ```
@@ -112,8 +112,8 @@ strong thing to quote on stage.**
 **Check it:**
 
 ```bash
-curl https://conduct-guardian-api.onrender.com/dashboard/stats
-curl -X POST https://conduct-guardian-api.onrender.com/ledger/verify
+curl https://conduct-guardian-api-ue84.onrender.com/dashboard/stats
+curl -X POST https://conduct-guardian-api-ue84.onrender.com/ledger/verify
 ```
 
 `/ledger/verify` must return `"valid": true` with `failed: 0`.
@@ -123,7 +123,7 @@ curl -X POST https://conduct-guardian-api.onrender.com/ledger/verify
 In the frontend project's Vercel settings → Environment Variables:
 
 ```
-NEXT_PUBLIC_API_BASE_URL = https://conduct-guardian-api.onrender.com
+NEXT_PUBLIC_API_BASE_URL = https://conduct-guardian-api-ue84.onrender.com
 ```
 
 Redeploy — Next.js inlines `NEXT_PUBLIC_*` at build time, so an existing
